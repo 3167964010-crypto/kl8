@@ -22,7 +22,13 @@ jobs:
         with:
           python-version: '3.11'
 
+      # 大模型参数从仓库 Secrets 读取（Settings → Secrets and variables → Actions）
+      # 未配置时 sync_server 自动回退为本地统计模型，不影响快照生成
       - name: 生成数据快照
+        env:
+          KL8_LLM_URL: ${{ secrets.KL8_LLM_URL }}
+          KL8_LLM_KEY: ${{ secrets.KL8_LLM_KEY }}
+          KL8_LLM_MODEL: ${{ secrets.KL8_LLM_MODEL }}
         run: python build_snapshot.py
 
       - name: 提交更新

@@ -12,7 +12,8 @@ const CORE = [
   './snapshot.json',
   './algos_snapshot.json',
   './kl8_snapshot.json',
-  './manifest.json'
+  './manifest.json',
+  './gate.js'
 ];
 
 self.addEventListener('install', (event) => {

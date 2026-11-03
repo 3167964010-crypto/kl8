@@ -8,6 +8,8 @@
 <!-- 添加到主屏幕与离线缓存配置 -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0a1020">
+<!-- 访问口令门禁：未通过时先隐藏页面 -->
+<script src="gate.js"></script>
 <style>
   /* === 主题变量：深空霓虹 === */
   :root{
@@ -989,7 +991,12 @@ function loadLlmConf() {
       }
     })
     .catch(function () {
-      document.getElementById('llmStatus').textContent = '配置状态查询失败';
+      // 线上静态托管（GitHub Pages）没有本地服务，页面无法保存密钥：
+      // 直接隐藏配置入口，改为提示"大模型由云端定时任务调用"，避免误以为配置失败
+      document.getElementById('llmStatus').textContent =
+        '线上版：大模型由云端定时任务调用（密钥保存在 GitHub 仓库 Secrets，页面不保存也不展示）';
+      document.getElementById('llmToggle').style.display = 'none';
+      document.getElementById('llmForm').style.display = 'none';
     });
 }
 
