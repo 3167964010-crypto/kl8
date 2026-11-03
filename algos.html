@@ -1,0 +1,319 @@
+<!-- 6 套算法并行预测对比页：Tab 切换，每套独立追踪滚动命中率 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>算法对比测试 · 快乐8</title>
+<style>
+  /* === 深空霓虹主题（与主页一致） === */
+  :root{
+    --bg:#070b14; --bg2:rgba(255,255,255,.045); --ink:#e8eefc; --muted:#8b96b3;
+    --rule:rgba(148,163,204,.16); --accent:#00e5ff; --accent2:#a78bfa;
+    --font:'Microsoft YaHei','PingFang SC','Noto Sans SC',-apple-system,sans-serif;
+    --max:1120px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--font);color:var(--ink);line-height:1.7;font-size:15px;padding:22px 16px 52px;min-height:100vh;
+       background:
+         radial-gradient(900px 500px at 88% -10%, rgba(167,139,250,.16), transparent 60%),
+         radial-gradient(800px 480px at -8% 6%, rgba(0,229,255,.13), transparent 55%),
+         linear-gradient(180deg,#070b14 0%,#0a1020 60%,#070b14 100%);
+       background-attachment:fixed;}
+  .page{max-width:var(--max);margin:0 auto;}
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-thumb{background:rgba(0,229,255,.25);border-radius:5px;}
+  ::-webkit-scrollbar-track{background:rgba(255,255,255,.03);}
+
+  /* === 顶栏 === */
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--rule);}
+  .title{font-size:26px;font-weight:800;letter-spacing:.01em;
+         background:linear-gradient(90deg,#00e5ff,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .title small{display:block;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:2px;-webkit-text-fill-color:var(--accent);}
+  .navlink{display:inline-block;font-size:12px;color:var(--accent);font-weight:700;text-decoration:none;
+           border:1px solid rgba(0,229,255,.4);border-radius:8px;padding:6px 12px;background:rgba(0,229,255,.08);white-space:nowrap;}
+  .statusbar{font-size:12.5px;color:var(--muted);padding:12px 0;}
+  .statusbar b{color:var(--ink);font-variant-numeric:tabular-nums;}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:6px;vertical-align:1px;box-shadow:0 0 8px var(--accent);}
+
+  /* === 算法 Tab 栏 === */
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+  .tab{border:1px solid var(--rule);border-radius:10px;padding:10px 14px;cursor:pointer;background:var(--bg2);
+       color:var(--muted);font-size:13px;font-weight:700;min-width:150px;text-align:left;transition:all .15s;}
+  .tab small{display:block;font-size:11px;font-weight:400;margin-top:2px;color:var(--muted);}
+  .tab .trate{font-size:17px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums;}
+  .tab.on{border-color:var(--accent);box-shadow:0 0 16px rgba(0,229,255,.3);color:var(--ink);}
+  .tab:hover{border-color:rgba(0,229,255,.45);}
+
+  /* === 内容卡 === */
+  .card{background:var(--bg2);border:1px solid var(--rule);border-radius:14px;padding:18px 20px;backdrop-filter:blur(10px);margin-top:14px;}
+  .algo-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}
+  .algo-name{font-size:18px;font-weight:800;color:#fff;text-shadow:0 0 12px rgba(0,229,255,.4);}
+  .algo-desc{font-size:12.5px;color:var(--muted);}
+  .rate-line{margin:10px 0 4px;font-size:13.5px;}
+  .rate-line b{color:var(--accent);font-size:17px;text-shadow:0 0 10px rgba(0,229,255,.5);}
+  .dim{color:var(--muted);font-size:12px;}
+  .hit{color:#34f5c5;font-weight:700;}
+
+  /* === 号码球 === */
+  .balls{display:flex;gap:8px;flex-wrap:wrap;}
+  .ball{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+        font-size:14px;font-weight:800;color:#04101c;font-variant-numeric:tabular-nums;
+        background:linear-gradient(135deg,#22e6ff,#0aa2ff);
+        box-shadow:0 0 14px rgba(0,229,255,.55),inset 0 -2px 4px rgba(0,0,0,.25);}
+  .ball.sm{width:32px;height:32px;font-size:12.5px;}
+  .ball.gray{background:linear-gradient(135deg,#5b6478,#3a4152);color:#cfd6e4;box-shadow:none;}
+  .mini{display:inline-flex;width:26px;height:26px;border-radius:50%;align-items:center;justify-content:center;color:#04101c;font-size:11.5px;font-weight:800;
+        background:linear-gradient(135deg,#22e6ff,#0aa2ff);box-shadow:0 0 8px rgba(0,229,255,.45);margin:1px;}
+  .mini.gray{background:linear-gradient(135deg,#5b6478,#3a4152);color:#cfd6e4;box-shadow:none;}
+  .mini.gold{background:linear-gradient(135deg,#c4b5fd,#7c4dff);color:#120826;box-shadow:0 0 8px rgba(167,139,250,.5);}
+  /* 预测号码橙色，与"蓝色 = 已开奖号码"区分开 */
+  .mini.pred{background:linear-gradient(135deg,#ffd166,#ff9f43);color:#1a0f00;box-shadow:0 0 8px rgba(255,180,60,.45);}
+  /* 当前预测区的号码球同样是预测号码，统一用橙色，避免误读成开奖状态 */
+  .pickline .ball, .ten-balls .mini{background:linear-gradient(135deg,#ffd166,#ff9f43);color:#1a0f00;
+        box-shadow:0 0 12px rgba(255,180,60,.45),inset 0 -2px 4px rgba(0,0,0,.2);}
+
+  /* === 十玩法窗口 === */
+  .ten-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:10px 0 4px;}
+  .ten-card{border:1px solid var(--rule);border-radius:12px;padding:10px 12px;background:var(--bg2);}
+  .ten-title{font-size:13px;font-weight:800;color:var(--accent);margin-bottom:6px;text-shadow:0 0 10px rgba(0,229,255,.4);}
+  .ten-balls{min-height:58px;margin-bottom:6px;line-height:2;}
+  .ten-tier{font-size:10.5px;color:var(--muted);line-height:1.6;border-top:1px dashed var(--rule);padding-top:5px;}
+  .ten-tier b{color:var(--accent2);font-weight:700;}
+  .ten-row{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .ten-row b{color:var(--ink);font-variant-numeric:tabular-nums;}
+  @media (max-width:820px){.ten-grid{grid-template-columns:repeat(2,1fr);}}
+
+  /* === 带标注的预测号码（各算法独立 UI） === */
+  .pickline{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0 2px;}
+  .pball{display:inline-flex;flex-direction:column;align-items:center;gap:3px;}
+  .pball i{font-style:normal;font-size:10px;color:#ffd166;white-space:nowrap;}
+
+  /* === 盈亏统计条 === */
+  .money{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);
+         border:1px solid var(--rule);border-radius:10px;padding:8px 14px;margin-top:10px;background:rgba(255,255,255,.02);}
+  .money b{color:var(--ink);font-variant-numeric:tabular-nums;}
+  .lose{color:#ff6b81;font-weight:700;}
+  .win{color:#34f5c5;font-weight:700;}
+  /* 奖金来源小字：说明这笔钱是哪个玩法中的 */
+  .src{display:block;font-size:10px;color:var(--muted);font-weight:400;line-height:1.4;}
+
+  /* === 历史表 === */
+  .bt-detail{max-height:340px;overflow:auto;border:1px solid var(--rule);border-radius:12px;margin-top:12px;}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  th{position:sticky;top:0;background:#0c1326;text-align:left;font-size:11.5px;font-weight:700;padding:7px 10px;border-bottom:1px solid var(--rule);white-space:nowrap;z-index:2;}
+  /* 可排序表头：点击切换升/降序，箭头 ▲/▼ 指示当前方向 */
+  th.sortable{cursor:pointer;user-select:none;transition:color .15s;}
+  th.sortable:hover{color:var(--accent);}
+  th.on{color:var(--accent);}
+  th .arw{font-size:10px;margin-left:4px;color:var(--muted);}
+  th.on .arw{color:var(--accent);}
+  td{padding:5px 10px;border-bottom:1px solid var(--rule);vertical-align:middle;}
+  .n{font-variant-numeric:tabular-nums;}
+  .note{background:var(--bg2);border-left:3px solid var(--accent);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--muted);margin-top:16px;}
+  .note strong{color:var(--ink);}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div class="title"><small>Algorithm Benchmark</small>算法对比测试</div>
+    <a class="navlink" href="index.html">← 返回预测台</a>
+    <a class="navlink" href="prize.html">奖金统计</a>
+  </header>
+  <div class="statusbar" id="statusbar"><span class="dot"></span><span id="status">正在加载 7 套算法预测…</span></div>
+
+  <!-- 算法 Tab 栏 -->
+  <div class="tabs" id="tabs"></div>
+
+  <!-- 当前算法内容 -->
+  <div class="card" id="algoCard"><div class="dim">加载中…</div></div>
+
+  <div class="note">
+    <strong>使用方法：</strong>每期开奖后，各套算法各自自动生成下一期预测（选一至选十取排序前 n 个），
+    开奖后自动结算。观察若干期后，对比各套的滚动命中率，再决定主用哪一套。
+    <strong>上期规律算法：</strong>以上一期开出的 20 个号码为基准打分——重号（上期开出）权重最高，其次是上期号码的邻号（±1），再次是同尾号，其余号码作为补位按号码顺序补齐。
+    <strong>随机对照组是基准线</strong>：任何算法若长期跑不赢它，说明该算法没有实际效力。
+    选一的理论命中率为 25%，各算法命中率围绕它波动属正常现象。
+  </div>
+</div>
+
+<script>
+/* ================= 数据加载与渲染（中文注释） ================= */
+var DATA = null;      // /api/algos 返回的完整状态
+var ACTIVE = 'ai';    // 当前选中的算法 id
+
+/* 每套算法的主题色：Tab 与卡片用各自颜色区分（独立 UI 展示） */
+var COLORS = {
+  ai: '#a78bfa', hot: '#ff7a59', miss: '#38bdf8',
+  momentum: '#34f5c5', balanced: '#ffd166', prev: '#fb7185', random: '#8b96b3'
+};
+
+function pad(n) { return n < 10 ? '0' + n : '' + n; }
+function ball(n, sm) { return '<span class="ball' + (sm ? ' sm' : '') + '">' + pad(n) + '</span>'; }
+function mini(n) { return '<span class="mini">' + pad(n) + '</span>'; }
+
+/* ===== 历史表排序（表头箭头） ===== */
+// 默认按期号降序：最新一期在最上面
+var HSORT = { col: 'target', dir: -1 };
+
+// 历史表列定义：k 为可排序字段，null 表示不排序
+function histCols() {
+  return [
+    { k: 'target', t: '期号' },
+    { k: null, t: '预测排序（前 10）' },
+    { k: null, t: '开奖结果' },
+    { k: 'hit', t: '选一' },
+    { k: 'h5', t: '选五（中·奖）' },
+    { k: 'h10', t: '选十（中·奖）' }
+  ];
+}
+
+// 取出某期在指定列上的排序值（未开奖记为 -1，排在最后）
+function sortVal(r, k) {
+  if (k === 'target') { return Number(r.target); }
+  if (k === 'hit') { return r.settled ? (r.hit ? 1 : 0) : -1; }
+  if (k === 'h5') { return r.settled && r.hits10 ? r.hits10['5'] : -1; }
+  if (k === 'h10') { return r.settled && r.hits10 ? r.hits10['10'] : -1; }
+  return 0;
+}
+
+// 生成历史表表头：当前排序列显示 ▲/▼，其余列显示 ⇅
+function histHead() {
+  return '<tr>' + histCols().map(function (c) {
+    if (!c.k) { return '<th>' + c.t + '</th>'; }
+    var on = HSORT.col === c.k;
+    var arw = on ? (HSORT.dir === 1 ? '▲' : '▼') : '⇅';
+    return '<th class="sortable' + (on ? ' on' : '') + '" data-hcol="' + c.k + '">' +
+      c.t + '<span class="arw">' + arw + '</span></th>';
+  }).join('') + '</tr>';
+}
+
+// 拉取 6 套算法状态
+function loadAlgos() {
+  // 优先本地接口；静态托管（无接口）时回退到预生成的 algos_snapshot.json
+  fetch('/api/algos', { cache: 'no-store' })
+    .then(function (r) {
+      if (!r.ok) throw new Error('api');
+      return r.json();
+    })
+    .catch(function () {
+      return fetch('algos_snapshot.json', { cache: 'no-store' }).then(function (r) { return r.json(); });
+    })
+    .then(function (d) {
+      if (d.state !== 0) { throw new Error(d.message || '接口异常'); }
+      DATA = d;
+      document.getElementById('status').textContent =
+        '已同步 · 下一期：第 ' + d.next_issue + ' 期（' + d.algos.length + ' 套算法均已生成预测）';
+      renderTabs();
+      renderAlgo();
+    })
+    .catch(function (e) {
+      document.getElementById('status').textContent = '加载失败：' + e.message;
+      document.getElementById('algoCard').innerHTML =
+        '<div class="dim">无法获取算法数据（需通过本地同步服务访问，请用「启动预测台.bat」打开）。</div>';
+    });
+}
+
+// 渲染 6 个 Tab（各自主题色 + 命中率 + 盈亏）
+function renderTabs() {
+  document.getElementById('tabs').innerHTML = DATA.algos.map(function (a) {
+    var rate = a.rate === null ? '—' : a.rate + '%';
+    var c = COLORS[a.id] || '#00e5ff';
+    var on = a.id === ACTIVE;
+    var style = on ? ' style="border-color:' + c + ';box-shadow:0 0 16px ' + c + '55;"' : '';
+    var sub = a.total ? '已结算 ' + a.total + ' 期' : '暂无结算';
+    return '<div class="tab' + (on ? ' on' : '') + '" data-id="' + a.id + '"' + style + '>' +
+      '<span style="color:' + c + ';">● </span>' + a.name +
+      '<div class="trate" style="color:' + c + ';">' + rate + '</div>' +
+      '<small>' + sub + '</small></div>';
+  }).join('');
+  var tabs = document.querySelectorAll('.tab');
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].addEventListener('click', function () {
+      ACTIVE = this.getAttribute('data-id');
+      renderTabs();
+      renderAlgo();
+    });
+  }
+}
+
+// 渲染当前选中算法的详细内容（独立逻辑标注 + 奖金对照）
+function renderAlgo() {
+  var a = DATA.algos.filter(function (x) { return x.id === ACTIVE; })[0];
+  var cur = a.current || { picks10: [] };
+  var c = COLORS[a.id] || '#00e5ff';
+  var cn = '一二三四五六七八九十';
+  // 当前预测：号码球 + 该算法独立逻辑的标注（如热号次数/遗漏期数）
+  var pickline = cur.picks10.map(function (x, i) {
+    return '<span class="pball">' + ball(x, true) +
+      '<i>' + (cur.notes && cur.notes[i] ? cur.notes[i] : '') + '</i></span>';
+  }).join('');
+  // 选一~选十窗口（附每种玩法的中奖数与金额对照）
+  var grid = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (n) {
+    var balls = cur.picks10.slice(0, n).map(function (x) { return mini(x); }).join(' ');
+    return '<div class="ten-card"><div class="ten-title" style="color:' + c + ';">选' + cn[n - 1] + '</div>' +
+      '<div class="ten-balls">' + (balls || '—') + '</div></div>';
+  }).join('');
+  // 滚动命中率
+  var rateTxt = a.rate === null ? '暂无已结算记录（首期预测待开奖）'
+    : '<b>' + a.rate + '%</b>（选一：已结算 ' + a.total + ' 期 · 命中 ' + a.hits + ' 期；理论基准 25%）';
+  // 历史记录：按当前选中列排序（表头点击切换），再渲染
+  var hist = (a.history || []).slice();
+  hist.sort(function (x, y) {
+    return (sortVal(x, HSORT.col) - sortVal(y, HSORT.col)) * HSORT.dir;
+  });
+  var rows = hist.map(function (r) {
+    var st = !r.settled ? '<span class="dim">待开奖</span>'
+      : (r.hit ? '<span class="hit">中 1 · 命中</span>' : '<span class="dim">中 0 · 未中</span>');
+    // 某玩法一格：只显示命中个数（未开奖或无数据则 —）
+    function cell(n) {
+      if (!r.settled || !r.hits10) { return '<span class="dim">—</span>'; }
+      return '中 ' + r.hits10[String(n)];
+    }
+    var nums = r.picks10.map(function (x) {
+      return '<span class="mini pred">' + pad(x) + '</span>';
+    }).join(' ');
+    // 该期实际开奖号码：与预测前 10 重叠的号码高亮，其余置灰
+    var act = r.actual || [];
+    var actHtml = act.length
+      ? act.map(function (x) {
+          return '<span class="mini' + (r.picks10.indexOf(x) >= 0 ? ' gold' : ' gray') + '">' + pad(x) + '</span>';
+        }).join('')
+      : '<span class="dim">—</span>';
+    return '<tr><td class="n">' + r.target + '</td><td>' + nums + '</td>' +
+      '<td>' + actHtml + '</td><td>' + st + '</td><td class="n">' + cell(5) + '</td><td class="n">' + cell(10) + '</td></tr>';
+  }).join('');
+  document.getElementById('algoCard').innerHTML =
+    '<div class="algo-head"><span class="algo-name" style="color:' + c + ';text-shadow:0 0 12px ' + c + '66;">' +
+      a.name + '</span><span class="algo-desc">' + a.desc + ' · 模型：' + (cur.method || '') + '</span></div>' +
+    '<div class="rate-line">第 ' + cur.target + ' 期预测 · 滚动命中率：' + rateTxt + '</div>' +
+    '<div class="dim">推荐排序（含各算法逻辑标注）：</div>' +
+    '<div class="pickline">' + pickline + '</div>' +
+    '<div class="dim" style="margin-top:12px;">选 n 玩法取前 n 个号码：</div>' +
+    '<div class="ten-grid">' + grid + '</div>' +
+    '<div class="dim" style="margin-top:12px;">历史对照：橙色 = 预测号码，紫色 = 开奖命中，灰色 = 开奖未中。</div>' +
+    '<div class="bt-detail"><table><thead>' + histHead() + '</thead>' +
+    '<tbody>' + rows + '</tbody></table></div>';
+  // 绑定历史表表头点击排序：同列反向，换列默认降序（最大值在最上）
+  var ths = document.querySelectorAll('#algoCard th.sortable');
+  for (var i = 0; i < ths.length; i++) {
+    ths[i].addEventListener('click', function () {
+      var col = this.getAttribute('data-hcol');
+      if (HSORT.col === col) {
+        HSORT.dir = -HSORT.dir;
+      } else {
+        HSORT.col = col;
+        HSORT.dir = -1;
+      }
+      renderAlgo();
+    });
+  }
+}
+
+loadAlgos();
+// 每 2 分钟自动轮询：官方发布新一期后自动结算并按最新数据重绘
+setInterval(loadAlgos, 2 * 60 * 1000);
+</script>
+</body>
+</html>

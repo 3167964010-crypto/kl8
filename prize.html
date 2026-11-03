@@ -1,0 +1,353 @@
+<!-- 奖金统计页：按算法统计十种玩法的中奖次数与奖金金额 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>奖金统计 · 快乐8</title>
+<style>
+  /* === 深空霓虹主题（与主页、算法页保持一致） === */
+  :root{
+    --bg:#070b14; --bg2:rgba(255,255,255,.045); --ink:#e8eefc; --muted:#8b96b3;
+    --rule:rgba(148,163,204,.16); --accent:#00e5ff; --accent2:#a78bfa; --gold:#ffd166;
+    --font:'Microsoft YaHei','PingFang SC','Noto Sans SC',-apple-system,sans-serif;
+    --max:1120px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--font);color:var(--ink);line-height:1.7;font-size:15px;padding:22px 16px 52px;min-height:100vh;
+       background:
+         radial-gradient(900px 500px at 88% -10%, rgba(167,139,250,.16), transparent 60%),
+         radial-gradient(800px 480px at -8% 6%, rgba(0,229,255,.13), transparent 55%),
+         linear-gradient(180deg,#070b14 0%,#0a1020 60%,#070b14 100%);
+       background-attachment:fixed;}
+  .page{max-width:var(--max);margin:0 auto;}
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-thumb{background:rgba(0,229,255,.25);border-radius:5px;}
+  ::-webkit-scrollbar-track{background:rgba(255,255,255,.03);}
+
+  /* === 顶栏 === */
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--rule);}
+  .title{font-size:26px;font-weight:800;letter-spacing:.01em;
+         background:linear-gradient(90deg,#00e5ff,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .title small{display:block;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:2px;-webkit-text-fill-color:var(--accent);}
+  .navlink{display:inline-block;font-size:12px;color:var(--accent);font-weight:700;text-decoration:none;
+           border:1px solid rgba(0,229,255,.4);border-radius:8px;padding:6px 12px;background:rgba(0,229,255,.08);white-space:nowrap;margin-left:8px;}
+  .statusbar{font-size:12.5px;color:var(--muted);padding:12px 0;}
+  .statusbar b{color:var(--ink);font-variant-numeric:tabular-nums;}
+
+  /* === 算法 Tab === */
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+  .tab{border:1px solid var(--rule);border-radius:10px;padding:9px 13px;cursor:pointer;background:var(--bg2);
+       color:var(--muted);font-size:13px;font-weight:700;transition:all .15s;font-family:var(--font);}
+  .tab.on{border-color:var(--accent);box-shadow:0 0 16px rgba(0,229,255,.3);color:var(--ink);}
+  .tab:hover{border-color:rgba(0,229,255,.45);}
+
+  /* === 卡片与汇总 === */
+  .card{background:var(--bg2);border:1px solid var(--rule);border-radius:14px;padding:18px 20px;backdrop-filter:blur(10px);margin-top:14px;}
+  .card h3{font-size:14px;font-weight:700;margin-bottom:12px;padding-left:10px;border-left:3px solid var(--accent);}
+  .sum{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+  .sum .item{background:rgba(255,255,255,.03);border:1px solid var(--rule);border-top:2px solid var(--accent);border-radius:12px;padding:13px 15px;}
+  .sum .item .num{font-size:20px;font-weight:800;color:var(--accent);line-height:1.3;font-variant-numeric:tabular-nums;}
+  .sum .item .num.gold{color:var(--gold);}
+  .sum .item .num.plus{color:#34f5c5;}
+  .sum .item .num.minus{color:#fb7185;}
+  .sum .item .label{font-size:12px;color:var(--muted);margin-top:3px;}
+  .dim{color:var(--muted);font-size:12px;}
+
+  /* === 表格 === */
+  .table-wrap{overflow:auto;border:1px solid var(--rule);border-radius:12px;background:rgba(255,255,255,.02);}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th{position:sticky;top:0;background:#0c1326;text-align:left;font-size:12px;font-weight:700;padding:8px 10px;
+     border-bottom:1px solid var(--rule);white-space:nowrap;z-index:2;}
+  td{padding:7px 10px;border-bottom:1px solid var(--rule);white-space:nowrap;font-variant-numeric:tabular-nums;}
+  tr:last-child td{border-bottom:none;}
+  .win{color:var(--gold);font-weight:700;}
+  .lose{color:var(--muted);}
+  .pending{color:var(--accent2);font-style:normal;}
+  .issue{font-weight:700;color:var(--ink);}
+  .legend{font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.7;}
+  .empty{padding:18px;text-align:center;color:var(--muted);font-size:13px;}
+  @media (max-width:860px){ .sum{grid-template-columns:repeat(2,1fr);} }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div class="title"><small>China Welfare Lottery · Prize</small>奖金统计</div>
+    <div>
+      <a class="navlink" href="index.html">← 返回预测台</a>
+      <a class="navlink" href="algos.html">算法对比</a>
+    </div>
+  </header>
+  <div class="statusbar" id="statusbar">加载中…</div>
+
+  <!-- 算法切换：每套算法独立统计 -->
+  <div class="tabs" id="tabs"></div>
+
+  <!-- 官方奖金对照表：自己对照命中档位查金额 -->
+  <div class="card">
+    <h3>官方奖金对照表（每注 2 元，单位：元）</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>玩法</th><th>中10个</th><th>中9个</th><th>中8个</th><th>中7个</th><th>中6个</th>
+            <th>中5个</th><th>中4个</th><th>中3个</th><th>中2个</th><th>中1个</th><th>全不中</th>
+          </tr>
+        </thead>
+        <tbody id="tierBody"></tbody>
+      </table>
+    </div>
+    <div class="legend">
+      横看一行即该玩法的全部奖级；「—」表示该档位没有奖金。选七/八/九/十 全不中返 2 元。
+    </div>
+  </div>
+
+  <!-- 累计汇总：投入、奖金、盈亏、中奖情况 -->
+  <div class="card">
+    <h3>累计统计（每期十种玩法各买 1 注，共 20 元）</h3>
+    <div class="sum" id="sum"></div>
+  </div>
+
+  <!-- 按玩法汇总：十种玩法各自的中奖次数与奖金 -->
+  <div class="card">
+    <h3>十种玩法 · 中奖次数与奖金</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>玩法</th><th>已购注数</th><th>中奖次数</th><th>中奖率</th>
+            <th>累计奖金</th><th>单注最高奖金</th><th>平均每次奖金</th>
+          </tr>
+        </thead>
+        <tbody id="playBody"></tbody>
+      </table>
+    </div>
+    <div class="legend">
+      注数 = 已结算期数（每期该玩法 1 注）；中奖次数 = 命中档位且奖金大于 0 的期数；
+      选七/八/九/十 全不中返 2 元计入中奖次数。
+    </div>
+  </div>
+
+  <!-- 每期明细：逐期查看各玩法命中数与奖金 -->
+  <div class="card">
+    <h3>每期明细 · 中奖数与奖金</h3>
+    <div class="table-wrap" style="max-height:620px">
+      <table>
+        <thead>
+          <tr id="detailHead"></tr>
+        </thead>
+        <tbody id="detailBody"></tbody>
+      </table>
+    </div>
+    <div class="legend">
+      每格格式为「选五 中 4 个 · 28 元」，金色表示该玩法当期有奖金；「待开奖」表示该期尚未开奖。
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============ 全局状态 ============ */
+var state = { data: null, cur: null };      // data：接口返回；cur：当前选中的算法 id
+
+/* 数字两位补零 */
+function pad(v) { return v < 10 ? '0' + v : '' + v; }
+
+/* 金额格式化：整数不带小数，其余保留两位 */
+function money(v) {
+  v = Number(v) || 0;
+  return v % 1 === 0 ? String(v) : v.toFixed(2);
+}
+
+/* ============ 数据加载 ============ */
+function load() {
+  // 优先本地接口；静态托管（无接口）时回退到预生成的 algos_snapshot.json
+  fetch('/api/algos', { cache: 'no-store' })
+    .then(function (r) {
+      if (!r.ok) throw new Error('api');
+      return r.json();
+    })
+    .catch(function () {
+      return fetch('algos_snapshot.json', { cache: 'no-store' }).then(function (r) { return r.json(); });
+    })
+    .then(function (d) {
+      if (!d || d.state !== 0) {
+        document.getElementById('statusbar').textContent = (d && d.message) || '获取失败';
+        return;
+      }
+      state.data = d;
+      // 默认展示第一套算法（AI 大模型）
+      if (!state.cur && d.algos && d.algos.length) state.cur = d.algos[0].id;
+      renderTabs();
+      renderAll();
+      document.getElementById('statusbar').innerHTML =
+        '<b>' + d.algos.length + '</b> 套算法 · 下一期 <b>' +
+        (d.next_issue || '—') + '</b> · 数据来自本地同步服务';
+    })
+    .catch(function (e) {
+      document.getElementById('statusbar').textContent = '连接失败：' + e.message;
+    });
+}
+
+/* 取当前选中的算法对象 */
+function curAlgo() {
+  if (!state.data) return null;
+  for (var i = 0; i < state.data.algos.length; i++) {
+    if (state.data.algos[i].id === state.cur) return state.data.algos[i];
+  }
+  return state.data.algos[0] || null;
+}
+
+/* 取某期某玩法的奖金：优先用接口已算好的 prize10，缺失时按官方奖金表回算 */
+function prizeOf(rec, n) {
+  var p = rec.prize10 && rec.prize10[String(n)];
+  if (p !== undefined && p !== null) return Number(p);
+  var hits = rec.hits10 ? rec.hits10[String(n)] : 0;
+  var tbl = (state.data.prize_table || {})[String(n)] || {};
+  return Number(tbl[String(hits)] || 0);
+}
+
+/* ============ Tab 渲染 ============ */
+function renderTabs() {
+  var box = document.getElementById('tabs');
+  box.innerHTML = state.data.algos.map(function (a) {
+    var cls = 'tab' + (a.id === state.cur ? ' on' : '');
+    return '<button class="' + cls + '" data-id="' + a.id + '">' + a.name + '</button>';
+  }).join('');
+  Array.prototype.forEach.call(box.querySelectorAll('.tab'), function (btn) {
+    btn.addEventListener('click', function () {
+      state.cur = btn.getAttribute('data-id');   // 切换算法后重绘全部区块
+      renderTabs();
+      renderAll();
+    });
+  });
+}
+
+/* 渲染除 Tab 以外的所有区块 */
+function renderAll() {
+  renderTiers();
+  renderSummary();
+  renderPlayTable();
+  renderDetail();
+}
+
+/* ============ 官方奖金对照表 ============ */
+function renderTiers() {
+  var tbl = (state.data && state.data.prize_table) || {};
+  var names = ['一','二','三','四','五','六','七','八','九','十'];
+  var html = '';
+  for (var n = 1; n <= 10; n++) {
+    var row = tbl[String(n)] || {};
+    var cells = '<td class="issue">选' + names[n - 1] + '</td>';
+    // 从高到低列出中 10 个 → 中 1 个，最后是全不中
+    for (var k = 10; k >= 1; k--) {
+      var v = row[String(k)];
+      var has = (v !== undefined && Number(v) > 0);
+      // 只有 k <= n 的档位可能中奖，其余显示「—」
+      cells += '<td class="' + (has ? 'win' : 'lose') + '">' +
+               (has ? money(v) : '—') + '</td>';
+    }
+    var zero = row['0'];
+    cells += '<td class="' + (zero ? 'win' : 'lose') + '">' +
+             (zero ? money(zero) : '—') + '</td>';
+    html += '<tr>' + cells + '</tr>';
+  }
+  document.getElementById('tierBody').innerHTML = html;
+}
+
+/* ============ 累计汇总 ============ */
+function renderSummary() {
+  var a = curAlgo();
+  if (!a) return;
+  var settled = (a.history || []).filter(function (r) { return r.settled; });
+  var cost = settled.length * 20;                        // 每期 10 种玩法 × 2 元
+  var prize = 0;
+  var winRounds = 0;                                     // 当期至少有一个玩法中奖的期数
+  settled.forEach(function (r) {
+    var sum = 0;
+    for (var n = 1; n <= 10; n++) sum += prizeOf(r, n);
+    prize += sum;
+    if (sum > 0) winRounds++;
+  });
+  var net = prize - cost;
+  var netCls = net > 0 ? 'plus' : (net < 0 ? 'minus' : '');
+  document.getElementById('sum').innerHTML =
+    '<div class="item"><div class="num">' + settled.length + '</div><div class="label">已结算期数</div></div>' +
+    '<div class="item"><div class="num">' + money(cost) + '</div><div class="label">累计投入（元）</div></div>' +
+    '<div class="item"><div class="num gold">' + money(prize) + '</div><div class="label">累计奖金（元）</div></div>' +
+    '<div class="item"><div class="num ' + netCls + '">' + (net > 0 ? '+' : '') + money(net) +
+    '</div><div class="label">累计盈亏（元）· 有奖 ' + winRounds + ' 期</div></div>';
+}
+
+/* ============ 十种玩法汇总表 ============ */
+function renderPlayTable() {
+  var a = curAlgo();
+  if (!a) return;
+  var settled = (a.history || []).filter(function (r) { return r.settled; });
+  var body = document.getElementById('playBody');
+  if (!settled.length) {
+    body.innerHTML = '<tr><td colspan="7" class="empty">暂无已结算记录，开奖后自动统计</td></tr>';
+    return;
+  }
+  var html = '';
+  for (var n = 1; n <= 10; n++) {
+    var win = 0, sum = 0, best = 0;
+    settled.forEach(function (r) {          // 逐期累计该玩法的中奖次数与奖金
+      var p = prizeOf(r, n);
+      if (p > 0) { win++; sum += p; if (p > best) best = p; }
+    });
+    var rate = settled.length ? (win / settled.length * 100) : 0;
+    html += '<tr>' +
+      '<td class="issue">选' + ['一','二','三','四','五','六','七','八','九','十'][n - 1] + '</td>' +
+      '<td>' + settled.length + '</td>' +
+      '<td class="' + (win ? 'win' : 'lose') + '">' + win + '</td>' +
+      '<td class="' + (win ? 'win' : 'lose') + '">' + rate.toFixed(1) + '%</td>' +
+      '<td class="' + (sum ? 'win' : 'lose') + '">' + money(sum) + '</td>' +
+      '<td class="' + (best ? 'win' : 'lose') + '">' + money(best) + '</td>' +
+      '<td>' + (win ? money(sum / win) : '0') + '</td>' +
+      '</tr>';
+  }
+  body.innerHTML = html;
+}
+
+/* ============ 每期明细表 ============ */
+function renderDetail() {
+  var a = curAlgo();
+  if (!a) return;
+  var head = document.getElementById('detailHead');
+  var body = document.getElementById('detailBody');
+  // 表头：期号 + 十个玩法 + 单期合计
+  var names = ['一','二','三','四','五','六','七','八','九','十'];
+  head.innerHTML = '<th>期号</th>' +
+    names.map(function (c) { return '<th>选' + c + '</th>'; }).join('') +
+    '<th>单期合计</th>';
+  if (!a.history || !a.history.length) {
+    body.innerHTML = '<tr><td colspan="12" class="empty">暂无记录</td></tr>';
+    return;
+  }
+  body.innerHTML = a.history.map(function (r) {
+    var cells = '';
+    var total = 0;
+    for (var n = 1; n <= 10; n++) {
+      if (!r.settled) {                       // 未开奖的期只显示待开奖
+        cells += '<td class="pending">待开奖</td>';
+        continue;
+      }
+      var hits = r.hits10 ? r.hits10[String(n)] : 0;
+      var p = prizeOf(r, n);
+      total += p;
+      // 单元格显式写出玩法名与命中数，如「选五 中 4 个 · 28 元」，避免只看到数字看不懂玩法
+      cells += '<td class="' + (p > 0 ? 'win' : 'lose') + '">选' + names[n - 1] +
+               ' 中 ' + hits + ' 个 · ' + money(p) + ' 元</td>';
+    }
+    var sumCell = r.settled
+      ? '<td class="' + (total > 0 ? 'win' : 'lose') + '">' + money(total) + ' 元</td>'
+      : '<td class="pending">—</td>';
+    return '<tr><td class="issue">' + r.target + '</td>' + cells + sumCell + '</tr>';
+  }).join('');
+}
+
+load();   // 页面打开即加载数据
+</script>
+</body>
+</html>

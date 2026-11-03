@@ -1,0 +1,11 @@
+{
+  "name": "快乐8 预测台",
+  "short_name": "快乐8",
+  "description": "快乐8 开奖记录与号码统计",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#070b14",
+  "theme_color": "#0a1020",
+  "lang": "zh-CN"
+}

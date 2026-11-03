@@ -1,0 +1,7 @@
+# 大模型密钥等本地配置，切勿上传到公开仓库
+llm_config.json
+# 自选号码的个人定稿记录（仅本机使用）
+user_picks.json
+# Python 运行缓存
+__pycache__/
+*.pyc

@@ -1,0 +1,38 @@
+# 每天两次生成快乐8数据快照并提交，供 GitHub Pages 静态展示
+name: 更新快乐8数据快照
+
+on:
+  schedule:
+    # 北京时间 21:35 与 22:05（GitHub 使用 UTC，需减 8 小时）
+    - cron: '35 13 * * *'
+    - cron: '5 14 * * *'
+  workflow_dispatch: {}   # 支持手动触发
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write       # 允许把生成结果提交回仓库
+    steps:
+      - name: 拉取仓库
+        uses: actions/checkout@v4
+
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 生成数据快照
+        run: python build_snapshot.py
+
+      - name: 提交更新
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add snapshot.json algos_snapshot.json kl8_snapshot.json predictions.json algo_predictions.json history_backtest.json
+          if git diff --cached --quiet; then
+            echo "数据无变化，跳过提交"
+          else
+            git commit -m "chore: 更新快乐8数据快照 $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push
+          fi
