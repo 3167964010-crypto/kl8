@@ -7,6 +7,9 @@
   var FLAG = 'kl8_gate_v1';    // 本机记住"已通过"的标记名
 
   var passed = false;
+  // 本机调试（本地服务或直接打开文件）不拦，避免自己每次都要输口令
+  if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) || location.protocol === 'file:') return;
+
   try { passed = localStorage.getItem(FLAG) === '1'; } catch (e) { /* 隐私模式下会失败，按未通过处理 */ }
   if (passed) return;          // 已通过过：直接显示页面
 
