@@ -75,9 +75,21 @@
   .kpi .label{font-size:12px;color:var(--muted);margin-top:4px;}
 
   /* === 预测号码 === */
-  .picks{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:14px;}
-  .pick{background:var(--bg2);border:1px solid var(--rule);border-radius:12px;padding:16px 18px;border-top:2px solid var(--accent);}
+  /* 十种玩法推荐卡：自动换行排列，宽屏每行 5 张、窄屏 2 张 */
+  .picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:12px;margin-top:14px;}
+  .pick{background:var(--bg2);border:1px solid var(--rule);border-radius:12px;padding:14px 16px;border-top:2px solid var(--accent);}
+  .pick-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
   .pick .tag{font-size:11px;letter-spacing:.1em;color:var(--accent);font-weight:700;}
+  /* 复制按钮：把该玩法号码写进剪贴板，方便粘贴到投注软件 */
+  .copy-btn{font:inherit;font-size:11px;line-height:1.4;padding:2px 9px;border-radius:6px;cursor:pointer;
+            background:rgba(255,159,67,.12);color:#ffb860;border:1px solid rgba(255,159,67,.45);white-space:nowrap;}
+  .copy-btn:hover{background:rgba(255,159,67,.24);box-shadow:0 0 10px rgba(255,159,67,.3);}
+  .copy-btn.done{color:#34f5c5;border-color:rgba(52,245,197,.5);background:rgba(52,245,197,.12);}
+  /* 复制结果轻提示 */
+  .toast{position:fixed;left:50%;bottom:38px;transform:translateX(-50%);z-index:99999;
+         background:rgba(6,12,24,.92);color:#e8eefc;border:1px solid rgba(0,229,255,.5);border-radius:10px;
+         padding:10px 18px;font-size:13px;box-shadow:0 0 22px rgba(0,229,255,.35);opacity:0;transition:opacity .2s;pointer-events:none;}
+  .toast.on{opacity:1;}
   .pick .why{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6;}
   .pick .balls{margin-top:10px;}
 
@@ -174,7 +186,8 @@
   .ten-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:6px 0 4px;}
   .ten-card{border:1px solid var(--rule);border-radius:12px;padding:10px 12px;background:var(--bg2);transition:box-shadow .15s,border-color .15s;}
   .ten-card:hover{border-color:rgba(0,229,255,.45);box-shadow:0 0 14px rgba(0,229,255,.2);}
-  .ten-title{font-size:13px;font-weight:800;color:var(--accent);margin-bottom:6px;text-shadow:0 0 10px rgba(0,229,255,.4);}
+  .ten-title{display:flex;align-items:center;justify-content:space-between;gap:6px;
+             font-size:13px;font-weight:800;color:var(--accent);margin-bottom:6px;text-shadow:0 0 10px rgba(0,229,255,.4);}
   .ten-balls{min-height:58px;margin-bottom:8px;line-height:2;}
   .ten-row{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:2px;}
   .ten-row b{color:var(--ink);font-variant-numeric:tabular-nums;}
@@ -493,7 +506,69 @@ function statsOf(num) {
   return state.stats[num - 1] || { score: 0, rate: 0, count: 0, miss: 0 };
 }
 
-// 渲染"预测号码"推荐卡：与 AI 预测共用同一推荐排序（选一=前2、选四=前4、选五=前5、选十=前10）
+// 轻提示：复制成功后在底部弹出一条文字，1.6 秒后淡出
+function showToast(text) {
+  var t = document.getElementById('copyToast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'copyToast';
+    t.className = 'toast';
+    document.body.appendChild(t);
+  }
+  t.textContent = text;
+  t.classList.add('on');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function () { t.classList.remove('on'); }, 1600);
+}
+
+// 把号码写入剪贴板：优先 Clipboard API，不可用时退回到临时文本框方案（兼容旧版与 http）
+function copyNums(nums, btn) {
+  var text = (nums || []).map(function (n) { return pad(n); }).join(' ');
+  if (!text) return;
+  function done() {
+    showToast('已复制：' + text);
+    if (btn) {
+      btn.classList.add('done');
+      var old = btn.textContent;
+      btn.textContent = '已复制';
+      setTimeout(function () { btn.classList.remove('done'); btn.textContent = old; }, 1400);
+    }
+  }
+  function fallback() {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px;top:0;';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    if (ok) done(); else showToast('复制失败，请手动选择号码');
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(fallback);
+  } else {
+    fallback();
+  }
+}
+
+// 给容器内所有带 data-copy（号码 JSON 数组）的按钮绑定复制行为
+function bindCopyButtons(root) {
+  Array.prototype.forEach.call(root.querySelectorAll('[data-copy]'), function (btn) {
+    btn.addEventListener('click', function () {
+      var nums = [];
+      try { nums = JSON.parse(btn.getAttribute('data-copy')); } catch (e) { nums = []; }
+      copyNums(nums, btn);
+    });
+  });
+}
+
+// 生成单个复制按钮：nums 为号码数组，直接序列化进 data-copy 属性
+function copyBtnHTML(nums) {
+  return '<button class="copy-btn" data-copy=\'' + JSON.stringify(nums || []) + '\'>复制</button>';
+}
+
+// 渲染"预测号码"推荐卡：选一至选十全部展示，与 AI 预测共用同一推荐排序（选 n = 前 n 个）
 function renderPickCards() {
   var el = document.getElementById('picks');
   var cur = state.predict && state.predict.current;
@@ -505,20 +580,23 @@ function renderPickCards() {
     picks10 = buildPicks(state.rows).ten;   // AI 预测未加载时的临时回退
     src = '本地多维评分排序（AI 预测加载后自动统一为 AI 排序）';
   }
-  el.innerHTML =
-    '<div class="pick"><div class="tag">选一 · 2 注</div><div class="balls">' +
-      picks10.slice(0, 2).map(function (n) { return ballHTML(n); }).join('') +
-      '</div><div class="why">推荐排序第 1、2 名。</div></div>' +
-    '<div class="pick"><div class="tag">选四 · 1 注</div><div class="balls">' +
-      picks10.slice(0, 4).map(function (n) { return ballHTML(n, 'sm'); }).join('') +
-      '</div><div class="why">推荐排序前 4 名。</div></div>' +
-    '<div class="pick"><div class="tag">选五 · 1 注</div><div class="balls">' +
-      picks10.slice(0, 5).map(function (n) { return ballHTML(n, 'sm'); }).join('') +
-      '</div><div class="why">推荐排序前 5 名。</div></div>' +
-    '<div class="pick"><div class="tag">选十 · 1 注</div><div class="balls">' +
-      picks10.slice(0, 10).map(function (n) { return ballHTML(n, 'sm'); }).join('') +
-      '</div><div class="why">推荐排序前 10 名。</div></div>' +
-    '<div class="bt-dim" style="grid-column:1/-1">' + src + '</div>';
+  var cn = '一二三四五六七八九十';
+  var cards = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (n) {
+    // 选一通常买 2 注：展示推荐排序前 2 名，各自单独一注
+    var take = n === 1 ? 2 : n;
+    var nums = picks10.slice(0, take);
+    var balls = nums.map(function (x) {
+      return ballHTML(x, n <= 2 ? '' : 'sm');
+    }).join('');
+    var why = n === 1 ? '推荐排序第 1、2 名，各买 1 注。' : '推荐排序前 ' + n + ' 名。';
+    return '<div class="pick">' +
+      '<div class="pick-head"><span class="tag">选' + cn[n - 1] +
+      (n === 1 ? ' · 2 注' : ' · 1 注') + '</span>' + copyBtnHTML(nums) + '</div>' +
+      '<div class="balls">' + (balls || '—') + '</div>' +
+      '<div class="why">' + why + '</div></div>';
+  }).join('');
+  el.innerHTML = cards + '<div class="bt-dim" style="grid-column:1/-1">' + src + '</div>';
+  bindCopyButtons(el);
 }
 
 // 渲染整页
@@ -910,7 +988,8 @@ function renderPredict(p) {
       '<div class="rec-head"><span class="rec-issue">第 ' + r.target_issue + ' 期</span>' +
       '<span class="bt-dim">' + (r.date || '') + '</span>' +
       '<span class="rec-src">' + (r.method || '') + '</span></div>' +
-      '<div class="rec-line pred"><span class="rec-tag">预测</span>' + (nums10 || '—') + '</div>' +
+      '<div class="rec-line pred"><span class="rec-tag">预测</span>' + (nums10 || '—') +
+      copyBtnHTML(r.picks10 || []) + '</div>' +
       '<div class="rec-line"><span class="rec-tag">开奖</span>' + (actual || '—') + '</div>' +
       '<div class="rec-line"><span class="rec-tag">命中</span>选一 ' +
       (r.hit ? '<b class="bt-hit">中</b>' : '<b class="bt-dim">未中</b>') +
@@ -941,6 +1020,7 @@ function renderPredict(p) {
         '<div class="ten-row"><span>回测平均命中</span><b>' + b.avg_hit + ' 个</b></div>';
     }) +
     '<div class="bt-detail" style="max-height:none">' + histHtml + '</div>';
+  bindCopyButtons(el);          // 十种玩法格子与历史预测行上的复制按钮统一绑定
   // 折叠按钮：展开 / 收起其余期数
   var tbtn = document.getElementById('recToggle');
   if (tbtn) {
@@ -961,7 +1041,7 @@ function buildTenGrid(picks10, footFn) {
       return '<span class="mini pred">' + pad(x) + '</span>';   // 预测号码统一橙色
     }).join(' ');
     return '<div class="ten-card">' +
-      '<div class="ten-title">选' + cn[n - 1] + '</div>' +
+      '<div class="ten-title">选' + cn[n - 1] + copyBtnHTML((picks10 || []).slice(0, n)) + '</div>' +
       '<div class="ten-balls">' + (balls || '—') + '</div>' +
       (footFn ? footFn(n) : '') +
       '</div>';
