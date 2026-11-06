@@ -240,8 +240,8 @@ function renderTabs() {
     var on = a.id === ACTIVE;
     var style = on ? ' style="border-color:' + c + ';box-shadow:0 0 16px ' + c + '55;"' : '';
     var sk = streakInfo(a.history);
-    var made = (a.history || []).length;                 // 已生成的预测期数（含待开奖那一期）
-    var sub = made ? '预测 ' + made + ' 期 · 命中 ' + (a.hits || 0) + ' 期' : '暂无预测';
+    // 期数只统计"已开奖结算"的期数，未开奖那期不参与命中判断
+    var sub = a.total ? '预测 ' + a.total + ' 期 · 命中 ' + (a.hits || 0) + ' 期' : '暂无已开奖期';
     // 当前连续状态：命中写"连续 N 期命中"，中断写"连续 N 期未中"，与详情口径一致
     if (a.total) {
       sub += sk.hit > 0 ? ' · 连续 ' + sk.hit + ' 期命中'

@@ -263,18 +263,7 @@
   </section>
 
 
-  <!-- 预测号码 -->
-  <section class="card" style="margin-top:16px">
-    <h3>预测号码（多维走势综合打分）</h3>
-    <div class="picks" id="picks"></div>
-    <div class="note">
-      <strong>算法依据：</strong>综合冷热走势（45%）、遗漏走势（20%）、近 10 期活跃度（20%）、
-      连出走势（10%）、分区轮动（5%）五项加权打分，覆盖基本走势 / 冷热 / 大小奇偶 / 分区等维度。
-      打分只代表历史统计上的相对热度，<strong>不是中奖概率</strong>，也不保证命中。
-    </div>
-  </section>
-
-  <!-- AI 预测（每期自动推测，滚动命中率） -->
+  <!-- AI 预测（每期自动推测，滚动命中率）：原先上方"预测号码"推荐卡与这里内容重复，已合并到此 -->
   <section class="card" style="margin-top:16px">
     <h3>AI 预测 · 每期自动推测</h3>
     <div id="aiPredict"></div>
@@ -568,37 +557,6 @@ function copyBtnHTML(nums) {
   return '<button class="copy-btn" data-copy=\'' + JSON.stringify(nums || []) + '\'>复制</button>';
 }
 
-// 渲染"预测号码"推荐卡：选一至选十全部展示，与 AI 预测共用同一推荐排序（选 n = 前 n 个）
-function renderPickCards() {
-  var el = document.getElementById('picks');
-  var cur = state.predict && state.predict.current;
-  var picks10 = cur && cur.picks10;
-  var src;
-  if (picks10 && picks10.length >= 10) {
-    src = '与下方 AI 预测同一推荐排序（' + (cur.method || '') + '），选 n 玩法取前 n 个';
-  } else {
-    picks10 = buildPicks(state.rows).ten;   // AI 预测未加载时的临时回退
-    src = '本地多维评分排序（AI 预测加载后自动统一为 AI 排序）';
-  }
-  var cn = '一二三四五六七八九十';
-  var cards = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (n) {
-    // 选一通常买 2 注：展示推荐排序前 2 名，各自单独一注
-    var take = n === 1 ? 2 : n;
-    var nums = picks10.slice(0, take);
-    var balls = nums.map(function (x) {
-      return ballHTML(x, n <= 2 ? '' : 'sm');
-    }).join('');
-    var why = n === 1 ? '推荐排序第 1、2 名，各买 1 注。' : '推荐排序前 ' + n + ' 名。';
-    return '<div class="pick">' +
-      '<div class="pick-head"><span class="tag">选' + cn[n - 1] +
-      (n === 1 ? ' · 2 注' : ' · 1 注') + '</span>' + copyBtnHTML(nums) + '</div>' +
-      '<div class="balls">' + (balls || '—') + '</div>' +
-      '<div class="why">' + why + '</div></div>';
-  }).join('');
-  el.innerHTML = cards + '<div class="bt-dim" style="grid-column:1/-1">' + src + '</div>';
-  bindCopyButtons(el);
-}
-
 // 渲染整页
 function render() {
   var rows = state.rows;
@@ -636,9 +594,6 @@ function render() {
     '<div class="kpi"><div class="num">' + hot.count + '<small>次</small></div><div class="label">最高频号 ' + pad(hot.num) + '，出现率 ' + (hot.rate * 100).toFixed(1) + '%</div></div>' +
     '<div class="kpi"><div class="num">' + deepest.miss + '<small>期</small></div><div class="label">最长遗漏 ' + pad(deepest.num) + ' 号</div></div>' +
     '<div class="kpi"><div class="num">' + sumAvg + '<small>均值</small></div><div class="label">' + rows.length + ' 期和值平均（理论 810）</div></div>';
-
-  // 预测号码推荐卡（与 AI 预测同一排序）
-  renderPickCards();
 
   renderBacktest();
   renderTable();
@@ -961,7 +916,7 @@ function loadPredict() {
 // 渲染 AI 预测：当前预测 + 滚动命中率 + 历史记录
 function renderPredict(p) {
   var el = document.getElementById('aiPredict');
-  if (p && p.state === 0) { state.predict = p; renderPickCards(); }  // 推荐卡与 AI 预测统一排序
+  if (p && p.state === 0) { state.predict = p; }
   if (!p || p.state !== 0) {
     el.innerHTML = '<div class="bt-row">' + (p && p.message ? p.message : '预测数据异常') + '</div>';
     return;

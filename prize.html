@@ -83,7 +83,10 @@
   </header>
   <div class="statusbar" id="statusbar">加载中…</div>
 
-  <!-- 每期明细：逐期查看各玩法命中数与奖金（页面固定统计 AI 大模型，与首页一致） -->
+  <!-- 算法切换：每套算法独立统计 -->
+  <div class="tabs" id="tabs"></div>
+
+  <!-- 每期明细：逐期查看各玩法命中数与奖金（放在最上面） -->
   <div class="card">
     <h3>每期明细 · 中奖数与奖金</h3>
     <div class="table-wrap" style="max-height:620px">
@@ -99,13 +102,7 @@
     </div>
   </div>
 
-  <!-- 累计汇总：投入、奖金、盈亏、中奖情况（倒数第 3 块） -->
-  <div class="card">
-    <h3>累计统计（每期十种玩法各买 1 注，共 20 元）</h3>
-    <div class="sum" id="sum"></div>
-  </div>
-
-  <!-- 按玩法汇总：十种玩法各自的中奖次数与奖金（倒数第 2 块） -->
+  <!-- 按玩法汇总：十种玩法各自的中奖次数与奖金（倒数第 3 块） -->
   <div class="card">
     <h3>十种玩法 · 中奖次数与奖金</h3>
     <div class="table-wrap">
@@ -123,6 +120,12 @@
       注数 = 已结算期数（每期该玩法 1 注）；中奖次数 = 命中档位且奖金大于 0 的期数；
       选七/八/九/十 全不中返 2 元计入中奖次数。
     </div>
+  </div>
+
+  <!-- 累计汇总：投入、奖金、盈亏、中奖情况（倒数第 2 块） -->
+  <div class="card">
+    <h3>累计统计（每期十种玩法各买 1 注，共 20 元）</h3>
+    <div class="sum" id="sum"></div>
   </div>
 
   <!-- 官方奖金对照表：放在最下方，方便自己对照命中档位查金额 -->
@@ -175,12 +178,12 @@ function load() {
         return;
       }
       state.data = d;
-      // 页面取消算法切换，固定统计 AI 大模型（与首页 AI 预测一致）
-      state.cur = 'ai';
+      // 默认展示第一套算法（AI 大模型）
+      if (!state.cur && d.algos && d.algos.length) state.cur = d.algos[0].id;
+      renderTabs();
       renderAll();
-      var ai = curAlgo();
       document.getElementById('statusbar').innerHTML =
-        '算法：<b>' + ((ai && ai.name) || 'AI 大模型') + '</b> · 下一期 <b>' +
+        '<b>' + d.algos.length + '</b> 套算法 · 下一期 <b>' +
         (d.next_issue || '—') + '</b> · 数据来自本地同步服务';
     })
     .catch(function (e) {
@@ -206,7 +209,23 @@ function prizeOf(rec, n) {
   return Number(tbl[String(hits)] || 0);
 }
 
-/* 渲染全部区块（页面固定统计 AI 大模型，故不再提供算法切换） */
+/* ============ Tab 渲染 ============ */
+function renderTabs() {
+  var box = document.getElementById('tabs');
+  box.innerHTML = state.data.algos.map(function (a) {
+    var cls = 'tab' + (a.id === state.cur ? ' on' : '');
+    return '<button class="' + cls + '" data-id="' + a.id + '">' + a.name + '</button>';
+  }).join('');
+  Array.prototype.forEach.call(box.querySelectorAll('.tab'), function (btn) {
+    btn.addEventListener('click', function () {
+      state.cur = btn.getAttribute('data-id');   // 切换算法后重绘全部区块
+      renderTabs();
+      renderAll();
+    });
+  });
+}
+
+/* 渲染除 Tab 以外的所有区块 */
 function renderAll() {
   renderTiers();
   renderSummary();
