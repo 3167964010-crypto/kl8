@@ -83,35 +83,29 @@
   </header>
   <div class="statusbar" id="statusbar">加载中…</div>
 
-  <!-- 算法切换：每套算法独立统计 -->
-  <div class="tabs" id="tabs"></div>
-
-  <!-- 官方奖金对照表：自己对照命中档位查金额 -->
+  <!-- 每期明细：逐期查看各玩法命中数与奖金（页面固定统计 AI 大模型，与首页一致） -->
   <div class="card">
-    <h3>官方奖金对照表（每注 2 元，单位：元）</h3>
-    <div class="table-wrap">
+    <h3>每期明细 · 中奖数与奖金</h3>
+    <div class="table-wrap" style="max-height:620px">
       <table>
         <thead>
-          <tr>
-            <th>玩法</th><th>中10个</th><th>中9个</th><th>中8个</th><th>中7个</th><th>中6个</th>
-            <th>中5个</th><th>中4个</th><th>中3个</th><th>中2个</th><th>中1个</th><th>全不中</th>
-          </tr>
+          <tr id="detailHead"></tr>
         </thead>
-        <tbody id="tierBody"></tbody>
+        <tbody id="detailBody"></tbody>
       </table>
     </div>
     <div class="legend">
-      横看一行即该玩法的全部奖级；「—」表示该档位没有奖金。选七/八/九/十 全不中返 2 元。
+      每格格式为「选五 中 4 个 · 28 元」，金色表示该玩法当期有奖金；「待开奖」表示该期尚未开奖。
     </div>
   </div>
 
-  <!-- 累计汇总：投入、奖金、盈亏、中奖情况 -->
+  <!-- 累计汇总：投入、奖金、盈亏、中奖情况（倒数第 3 块） -->
   <div class="card">
     <h3>累计统计（每期十种玩法各买 1 注，共 20 元）</h3>
     <div class="sum" id="sum"></div>
   </div>
 
-  <!-- 按玩法汇总：十种玩法各自的中奖次数与奖金 -->
+  <!-- 按玩法汇总：十种玩法各自的中奖次数与奖金（倒数第 2 块） -->
   <div class="card">
     <h3>十种玩法 · 中奖次数与奖金</h3>
     <div class="table-wrap">
@@ -131,19 +125,22 @@
     </div>
   </div>
 
-  <!-- 每期明细：逐期查看各玩法命中数与奖金 -->
+  <!-- 官方奖金对照表：放在最下方，方便自己对照命中档位查金额 -->
   <div class="card">
-    <h3>每期明细 · 中奖数与奖金</h3>
-    <div class="table-wrap" style="max-height:620px">
+    <h3>官方奖金对照表（每注 2 元，单位：元）</h3>
+    <div class="table-wrap">
       <table>
         <thead>
-          <tr id="detailHead"></tr>
+          <tr>
+            <th>玩法</th><th>中10个</th><th>中9个</th><th>中8个</th><th>中7个</th><th>中6个</th>
+            <th>中5个</th><th>中4个</th><th>中3个</th><th>中2个</th><th>中1个</th><th>全不中</th>
+          </tr>
         </thead>
-        <tbody id="detailBody"></tbody>
+        <tbody id="tierBody"></tbody>
       </table>
     </div>
     <div class="legend">
-      每格格式为「选五 中 4 个 · 28 元」，金色表示该玩法当期有奖金；「待开奖」表示该期尚未开奖。
+      横看一行即该玩法的全部奖级；「—」表示该档位没有奖金。选七/八/九/十 全不中返 2 元。
     </div>
   </div>
 </div>
@@ -178,12 +175,12 @@ function load() {
         return;
       }
       state.data = d;
-      // 默认展示第一套算法（AI 大模型）
-      if (!state.cur && d.algos && d.algos.length) state.cur = d.algos[0].id;
-      renderTabs();
+      // 页面取消算法切换，固定统计 AI 大模型（与首页 AI 预测一致）
+      state.cur = 'ai';
       renderAll();
+      var ai = curAlgo();
       document.getElementById('statusbar').innerHTML =
-        '<b>' + d.algos.length + '</b> 套算法 · 下一期 <b>' +
+        '算法：<b>' + ((ai && ai.name) || 'AI 大模型') + '</b> · 下一期 <b>' +
         (d.next_issue || '—') + '</b> · 数据来自本地同步服务';
     })
     .catch(function (e) {
@@ -209,23 +206,7 @@ function prizeOf(rec, n) {
   return Number(tbl[String(hits)] || 0);
 }
 
-/* ============ Tab 渲染 ============ */
-function renderTabs() {
-  var box = document.getElementById('tabs');
-  box.innerHTML = state.data.algos.map(function (a) {
-    var cls = 'tab' + (a.id === state.cur ? ' on' : '');
-    return '<button class="' + cls + '" data-id="' + a.id + '">' + a.name + '</button>';
-  }).join('');
-  Array.prototype.forEach.call(box.querySelectorAll('.tab'), function (btn) {
-    btn.addEventListener('click', function () {
-      state.cur = btn.getAttribute('data-id');   // 切换算法后重绘全部区块
-      renderTabs();
-      renderAll();
-    });
-  });
-}
-
-/* 渲染除 Tab 以外的所有区块 */
+/* 渲染全部区块（页面固定统计 AI 大模型，故不再提供算法切换） */
 function renderAll() {
   renderTiers();
   renderSummary();

@@ -240,10 +240,12 @@ function renderTabs() {
     var on = a.id === ACTIVE;
     var style = on ? ' style="border-color:' + c + ';box-shadow:0 0 16px ' + c + '55;"' : '';
     var sk = streakInfo(a.history);
-    var sub = a.total ? '已结算 ' + a.total + ' 期' : '暂无结算';
-    // 在当前连续状态上再显示"连中/连失"，方便横向比较各算法手感
+    var made = (a.history || []).length;                 // 已生成的预测期数（含待开奖那一期）
+    var sub = made ? '预测 ' + made + ' 期 · 命中 ' + (a.hits || 0) + ' 期' : '暂无预测';
+    // 当前连续状态：命中写"连续 N 期命中"，中断写"连续 N 期未中"，与详情口径一致
     if (a.total) {
-      sub += sk.hit > 0 ? ' · 连中 ' + sk.hit + ' 期' : (sk.miss > 0 ? ' · 连失 ' + sk.miss + ' 期' : '');
+      sub += sk.hit > 0 ? ' · 连续 ' + sk.hit + ' 期命中'
+                        : (sk.miss > 0 ? ' · 连续 ' + sk.miss + ' 期未中' : '');
     }
     return '<div class="tab' + (on ? ' on' : '') + '" data-id="' + a.id + '"' + style + '>' +
       '<span style="color:' + c + ';">● </span>' + a.name +
@@ -342,6 +344,7 @@ function streakInfo(hist) {
     prize: streakRun(hist, function (r) { return Number(r.prize_total || 0) > 0; }),
     noPrizeStreak: streakRun(hist, function (r) { return Number(r.prize_total || 0) <= 0; }),
     noPrizeTotal: settled.filter(function (r) { return Number(r.prize_total || 0) <= 0; }).length,
+    missTotal: settled.filter(function (r) { return !r.hit; }).length,   // 累计未命中（与连续未中同口径）
     settled: settled.length
   };
 }
@@ -400,9 +403,9 @@ function renderAlgo() {
     '<div class="algo-head"><span class="algo-name" style="color:' + c + ';text-shadow:0 0 12px ' + c + '66;">' +
       a.name + '</span><span class="algo-desc">' + a.desc + ' · 模型：' + (cur.method || '') + '</span></div>' +
     '<div class="rate-line">第 ' + cur.target + ' 期预测 · 滚动命中率：' + rateTxt + '</div>' +
-    '<div class="streak-line">当前连续命中 <b>' + sk.hit + '</b> 期 · ' +
-      '<span class="miss">连续未中奖 <b>' + sk.noPrizeStreak + '</b> 期</span> · ' +
-      '累计未中奖 <b>' + sk.noPrizeTotal + '</b> / ' + sk.settled + ' 期</div>' +
+    '<div class="streak-line">连续命中 <b>' + sk.hit + '</b> 期 · ' +
+      '<span class="miss">连续未中 <b>' + sk.miss + '</b> 期</span> · ' +
+      '累计未中 <b>' + sk.missTotal + '</b> / ' + sk.settled + ' 期</div>' +
     '<div class="dim">推荐排序（含各算法逻辑标注）：</div>' +
     '<div class="pickline">' + pickline +
       '<button class="copy-btn" data-copy=\'' + JSON.stringify(cur.picks10 || []) + '\' style="align-self:center">复制前10</button>' +
