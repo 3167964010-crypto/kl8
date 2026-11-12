@@ -5,7 +5,7 @@
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f5f8fd",
-  "theme_color": "#f5f8fd",
+  "background_color": "#efeae2",
+  "theme_color": "#efeae2",
   "lang": "zh-CN"
 }
