@@ -305,13 +305,25 @@ def prize_amount(n, k):
     return PRIZE_TABLE.get(n, {}).get(k, 0)
 
 
+def play_bets(ranked, n, count=10):
+    """
+    为某玩法生成 count 注号码：每注取 n 个连续名次，相邻注错开一位。
+    这样 10 注覆盖的名次范围更宽，且不会出现完全相同的注。
+    """
+    pool = list(ranked)
+    if len(pool) < n + count - 1:          # 排序号码不足时用全号池补齐
+        pool += [x for x in range(1, 81) if x not in pool]
+    return [pool[i:i + n] for i in range(count)]
+
+
 def backtest10(rows, window=30):
     """
-    十种玩法滚动回测：对最近 window 期逐期模拟（只用该期之前的数据打分取 top-n），
-    统计每种玩法的平均命中数与回测中奖概率，并附理论中奖概率。
+    十种玩法滚动回测：对最近 window 期逐期模拟（只用该期之前的数据打分取排序），
+    统计每种玩法的平均命中数、单注回测中奖率，以及"10 注玩法"的注级命中率。
     """
     start = max(20, len(rows) - window)          # 至少保留 20 期历史用于打分
-    agg = {n: {"hits": 0, "prize": 0, "cnt": 0} for n in range(1, 11)}
+    agg = {n: {"hits": 0, "prize": 0, "cnt": 0, "bet_win": 0, "bet_cnt": 0}
+           for n in range(1, 11)}
     for i in range(start, len(rows)):
         ranked = ranked_numbers(rows[:i])        # 该期之前的数据生成的排序
         actual = rows[i]["nums"]
@@ -322,6 +334,11 @@ def backtest10(rows, window=30):
             a["cnt"] += 1
             if prize_hit(n, k):
                 a["prize"] += 1
+            # 10 注玩法：逐注判断是否中奖，统计注级命中率
+            for bet in play_bets(ranked, n):
+                a["bet_cnt"] += 1
+                if prize_hit(n, len(set(bet) & actual)):
+                    a["bet_win"] += 1
     out = []
     for n in range(1, 11):
         a = agg[n]
@@ -329,6 +346,10 @@ def backtest10(rows, window=30):
             "n": n,
             "avg_hit": round(a["hits"] / a["cnt"], 2) if a["cnt"] else 0,
             "prize_rate": round(a["prize"] / a["cnt"] * 100, 1) if a["cnt"] else 0,
+            "bet_rate": round(a["bet_win"] / a["bet_cnt"] * 100, 1) if a["bet_cnt"] else 0,
+            "bet_win": a["bet_win"],
+            "bet_cnt": a["bet_cnt"],
+            "window": len(rows) - start,         # 实际回测期数
             "theo_rate": round(theo_prize_prob(n) * 100, 2),
         })
     return out
@@ -485,6 +506,16 @@ def settle_and_predict():
         if "ctx" not in rec:
             rec["ctx"] = min(100, len(rows))
             changed = True
+
+    # 十种玩法各生成 10 注：模型前 10 推荐优先，其余按本地评分补足名次
+    if current is not None:
+        order = list(current.get("picks10") or [])
+        order += [x for x in ranked_numbers(model_rows) if x not in order]
+        if order:
+            bets = {str(n): play_bets(order, n) for n in range(1, 11)}
+            if current.get("bets") != bets:
+                current["bets"] = bets
+                changed = True
 
     if changed:
         save_predictions(state)

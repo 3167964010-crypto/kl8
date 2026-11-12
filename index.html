@@ -312,6 +312,17 @@
   /* 轻提示：暖白卡片，不再弹出黑块 */
   .toast{background:rgba(250,247,241,.98);color:var(--ink);border-color:rgba(154,106,26,.32);
          box-shadow:0 8px 24px rgba(90,76,58,.16);}
+  /* === 十玩法 10 注展示：每注一行，号码等宽对齐 === */
+  .ten-count{font-size:10.5px;color:var(--muted);font-weight:400;margin-left:4px;}
+  .bet-list{margin:6px 0;}
+  .bet-row{display:flex;align-items:center;gap:4px;font-size:11.5px;line-height:1.9;
+           border-bottom:1px dashed var(--rule);padding:1px 0;}
+  .bet-row:last-child{border-bottom:none;}
+  .bet-idx{flex:0 0 14px;text-align:right;color:var(--muted);font-size:10px;}
+  .bet-num{display:inline-block;min-width:21px;font-variant-numeric:tabular-nums;color:var(--ink);}
+  /* 每格需放下 10 注，桌面端自动两列左右，手机单列 */
+  .ten-grid{grid-template-columns:repeat(auto-fill,minmax(290px,1fr));}
+  @media (max-width:640px){.ten-grid{grid-template-columns:1fr;}.bet-row{font-size:11px;}}
   ::-webkit-scrollbar-thumb{background:rgba(109,90,156,.28);}
   ::-webkit-scrollbar-track{background:rgba(58,53,46,.06);}
 </style>
@@ -602,10 +613,14 @@ function showToast(text) {
 
 // 把号码写入剪贴板：优先 Clipboard API，不可用时退回到临时文本框方案（兼容旧版与 http）
 function copyNums(nums, btn) {
-  var text = (nums || []).map(function (n) { return pad(n); }).join(' ');
+  // 支持两种结构：[1,2,3] 单注；[[1,2],[3,4]] 多注（每注一行，方便直接粘到投注软件）
+  var multi = (nums || []).some(function (x) { return Array.isArray(x); });
+  var text = (nums || []).map(function (n) {
+    return Array.isArray(n) ? n.map(function (v) { return pad(v); }).join(' ') : pad(n);
+  }).join('\n');
   if (!text) return;
   function done() {
-    showToast('已复制：' + text);
+    showToast(multi ? '已复制 ' + nums.length + ' 注号码' : '已复制：' + text);
     if (btn) {
       btn.classList.add('done');
       var old = btn.textContent;
@@ -1054,16 +1069,20 @@ function renderPredict(p) {
   el.innerHTML =
     '<div class="ai-cur">' +
       '<div><div class="bt-dim">第 ' + (cur.target_issue || '—') + ' 期预测（基于第 ' + (cur.based_on || '—') + ' 期数据生成）</div>' +
-      '<div class="bt-dim" style="margin-top:4px;font-size:11px">按推荐度排序，选 n 玩法取前 n 个</div></div>' +
+      '<div class="bt-dim" style="margin-top:4px;font-size:11px">每个玩法各推 10 注（按推荐度滑窗取号），命中率按逐注回测统计</div></div>' +
       '<div class="ai-side"><div class="ai-logic">' + (cur.logic || '') + '</div>' +
       '<div class="bt-dim">模型：' + (cur.method || '') + ' · 输入模型的数据样本：' + (cur.ctx || '—') + ' 期开奖数据</div></div>' +
     '</div>' +
     '<div class="ai-rate">滚动命中率：' + rateTxt + '</div>' +
     buildTenGrid(cur.picks10 || [], function (n) {
-      var b = btMap[n] || { theo_rate: 0, prize_rate: 0, avg_hit: 0 };
-      return '<div class="ten-row"><span>理论 / 回测中奖率</span><b>' + b.theo_rate.toFixed(2) + '% / ' + b.prize_rate.toFixed(1) + '%</b></div>' +
-        '<div class="ten-row"><span>回测平均命中</span><b>' + b.avg_hit + ' 个</b></div>';
-    }) +
+      var b = btMap[n] || {};
+      var betTxt = (b.bet_rate === undefined) ? '—' : b.bet_rate.toFixed(1) + '%';
+      var winTxt = (b.bet_win || 0) + ' / ' + (b.bet_cnt || 0);
+      return '<div class="ten-row"><span>10 注命中率</span><b>' + betTxt + '</b></div>' +
+        '<div class="ten-row"><span>中奖注数（近 ' + (b.window || 30) + ' 期）</span><b>' + winTxt + '</b></div>' +
+        '<div class="ten-row"><span>单注理论中奖率</span><b>' + (b.theo_rate || 0).toFixed(2) + '%</b></div>' +
+        '<div class="ten-row"><span>回测平均命中</span><b>' + (b.avg_hit || 0) + ' 个</b></div>';
+    }, cur.bets) +
     '<div class="bt-detail" style="max-height:none">' + histHtml + '</div>';
   bindCopyButtons(el);          // 十种玩法格子与历史预测行上的复制按钮统一绑定
   // 折叠按钮：展开 / 收起其余期数
@@ -1078,16 +1097,33 @@ function renderPredict(p) {
   }
 }
 
-// 渲染十种玩法窗口网格（当前预测与历史记录共用；footFn(n) 生成每格底部行）
-function buildTenGrid(picks10, footFn) {
+// 渲染十种玩法卡片：优先生成 10 注（betsMap）；旧快照没有 10 注时退回"取前 n 个"
+function buildTenGrid(picks10, footFn, betsMap) {
   var cn = '一二三四五六七八九十';
   var cards = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (n) {
-    var balls = (picks10 || []).slice(0, n).map(function (x) {
-      return '<span class="mini pred">' + pad(x) + '</span>';   // 预测号码统一橙色
-    }).join(' ');
+    var list = betsMap && betsMap[String(n)];
+    if (!list || !list.length) {
+      // 兼容旧快照：仍按"选 n 取前 n 个"展示
+      var one = (picks10 || []).slice(0, n);
+      var balls = one.map(function (x) {
+        return '<span class="mini pred">' + pad(x) + '</span>';   // 预测号码统一橙色
+      }).join(' ');
+      return '<div class="ten-card">' +
+        '<div class="ten-title">选' + cn[n - 1] + copyBtnHTML(one) + '</div>' +
+        '<div class="ten-balls">' + (balls || '—') + '</div>' +
+        (footFn ? footFn(n) : '') +
+        '</div>';
+    }
+    // 每注一行；标题栏的复制按钮一次复制全部 10 注（每注一行）
+    var rows = list.map(function (b, i) {
+      return '<div class="bet-row"><span class="bet-idx">' + (i + 1) + '</span>' +
+        b.map(function (x) { return '<span class="bet-num">' + pad(x) + '</span>'; }).join('') +
+        '</div>';
+    }).join('');
     return '<div class="ten-card">' +
-      '<div class="ten-title">选' + cn[n - 1] + copyBtnHTML((picks10 || []).slice(0, n)) + '</div>' +
-      '<div class="ten-balls">' + (balls || '—') + '</div>' +
+      '<div class="ten-title">选' + cn[n - 1] +
+        '<span class="ten-count">共 10 注</span>' + copyBtnHTML(list) + '</div>' +
+      '<div class="bet-list">' + rows + '</div>' +
       (footFn ? footFn(n) : '') +
       '</div>';
   }).join('');
