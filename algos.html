@@ -129,6 +129,37 @@
   .n{font-variant-numeric:tabular-nums;}
   .note{background:var(--bg2);border-left:3px solid var(--accent);border-radius:8px;padding:12px 16px;font-size:13px;color:var(--muted);margin-top:16px;}
   .note strong{color:var(--ink);}
+
+  /* === 手机端适配（宽度 ≤ 640px）：Tab 两列、十玩法单列、表格横向滑动 === */
+  @media (max-width:640px){
+    body{padding:14px 10px 40px;font-size:14px;}
+    .title{font-size:21px;}
+    .title small{font-size:9.5px;letter-spacing:.16em;}
+    /* 顶栏：标题独占一行，两个导航按钮平分第二行 */
+    .topbar{gap:10px;}
+    .topbar .title{flex:1 1 100%;}
+    .topbar .navlink{flex:1 1 45%;margin-left:0;text-align:center;padding:9px 8px;}
+    .statusbar{font-size:11.5px;padding:10px 0;}
+    .card{padding:14px 13px;border-radius:12px;}
+    /* 8 套算法 Tab：两列网格铺满，避免长短不一挤成一片 */
+    .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;}
+    .tab{min-width:0;padding:9px 10px;font-size:12.5px;}
+    .tab small{font-size:10.5px;}
+    .algo-name{font-size:16px;}
+    .ten-grid{grid-template-columns:1fr;}
+    .ten-balls{min-height:0;}
+    .ball{width:34px;height:34px;font-size:12.5px;}
+    .ball.sm{width:29px;height:29px;font-size:11px;}
+    .mini{width:24px;height:24px;font-size:10.5px;}
+    .table-wrap{-webkit-overflow-scrolling:touch;}
+    table{font-size:12px;}
+    th,td{padding:6px 8px;}
+    .copy-btn{font-size:10.5px;padding:2px 8px;}
+    .rate-line{font-size:12.5px;}
+    .streak-line{font-size:11.5px;}
+    .note{padding:10px 12px;font-size:12px;}
+    footer{font-size:11px;}
+  }
 </style>
 </head>
 <body>

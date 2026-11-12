@@ -224,6 +224,50 @@
     .kpis{grid-template-columns:repeat(2,1fr);}
     .picks{grid-template-columns:repeat(2,1fr);}
   }
+
+  /* === 手机端适配（宽度 ≤ 640px）：压缩留白、按钮铺满、表格横向滑动 === */
+  @media (max-width:640px){
+    body{padding:14px 10px 40px;font-size:14px;}
+    .title{font-size:21px;}
+    .title small{font-size:9.5px;letter-spacing:.16em;}
+    /* 顶栏：标题独占一行，操作按钮两列铺满，避免挤在一行 */
+    .topbar{gap:10px;}
+    .topbar > div:last-child{width:100%;display:grid !important;grid-template-columns:1fr 1fr;gap:8px;}
+    .topbar .chart-open,.topbar .btn{margin-left:0 !important;text-align:center;padding:9px 8px;}
+    /* 状态栏：两列网格，信息不再挤成一条长行 */
+    .statusbar{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:11.5px;padding:10px 0;}
+    .card{padding:14px 13px;border-radius:12px;}
+    .card h3{font-size:13px;}
+    /* 号码球略缩小：一行能放更多，减少折行 */
+    .ball{width:34px;height:34px;font-size:12.5px;}
+    .ball.sm{width:28px;height:28px;font-size:11px;}
+    .mini{width:24px;height:24px;font-size:10.5px;}
+    .ai-cur{gap:8px;}
+    .ai-cur .ball{width:40px;height:40px;font-size:15px;}
+    .ai-side{min-width:100%;}
+    .issue{font-size:17px;}
+    /* 十种玩法：手机上单列更易读，号码不会被挤成两行 */
+    .ten-grid{grid-template-columns:1fr;}
+    .ten-balls{min-height:0;}
+    .kpis{gap:8px;}
+    .kpi{padding:10px 12px;}
+    .kpi .num{font-size:19px;}
+    .toolbar{gap:8px;}
+    .toolbar h3{font-size:12.5px;}
+    .seg button{padding:5px 10px;font-size:11.5px;}
+    /* 表格：横向滑动查看全部列，触屏滚动更顺手 */
+    .table-wrap{-webkit-overflow-scrolling:touch;}
+    table{font-size:12px;min-width:600px;}
+    th,td{padding:6px 8px;}
+    .chart-frame{height:420px;}
+    .selfbox input{min-width:100%;}
+    .selfbox .btn{flex:1;}
+    .note{padding:10px 12px;font-size:12px;}
+    .bt-row{gap:10px;font-size:12.5px;}
+    .rec-tag{flex:0 0 30px;}
+    .rec-line{gap:4px;font-size:11.5px;}
+    footer{font-size:11px;}
+  }
 </style>
 </head>
 <body>
