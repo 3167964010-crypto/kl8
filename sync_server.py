@@ -562,7 +562,7 @@ def settle_upicks(rows):
 
 ALGO_FILE = os.path.join(BASE, "algo_predictions.json")   # 多算法预测记录
 
-# 算法清单：id、名称、说明
+# 算法清单：id、名称、说明（"重复号码"依赖其余算法结果，必须排在最后）
 ALGOS = [
     ("ai", "AI 大模型", "MiMo 大模型生成；未配置 API 时回退本地五维评分"),
     ("hot", "热号优先", "近 100 期出现次数最多的号码排前面（追热）"),
@@ -571,7 +571,10 @@ ALGOS = [
     ("balanced", "均衡结构", "五维评分基础上做分区配额与奇偶均衡"),
     ("prev", "上期规律", "以上一期号码为基准：重号 4 个 + 邻号 3 个 + 同尾号 3 个，跟随最近一期结构"),
     ("random", "随机对照", "以期号为种子的固定随机序列，作为基准线"),
+    ("consensus", "重复号码", "统计以上各套算法同一期共同推荐的号码，按被推荐次数（票数）排序"),
 ]
+
+CONSENSUS_ID = "consensus"      # 重复号码算法的 id，需要特殊处理（汇总其他算法）
 
 
 def load_json(path, default):
@@ -732,10 +735,60 @@ def algo_notes(rows, kind, picks10, stat=None):
     return ["#%d" % (i + 1) for i in range(len(picks10))]   # AI：大模型推荐顺位
 
 
+def consensus_votes(st, issue):
+    """
+    统计某一期各套算法共同推荐的票数（不含"重复号码"自身）。
+    返回 {号码: 被几套算法推荐}，用于票数排序与前端"重复数量"标注。
+    """
+    votes = {}
+    for aid, _name, _desc in ALGOS:
+        if aid == CONSENSUS_ID:
+            continue
+        for rec in (st["algos"].get(aid) or {}).get("history", []):
+            if rec.get("target") == issue:
+                for v in rec.get("picks10", []):
+                    votes[v] = votes.get(v, 0) + 1
+                break
+    return votes
+
+
+def consensus_history(st, box):
+    """
+    回填"重复号码"算法的往期记录：用其余算法同一期的推荐重新计票，
+    这样中奖率一开始就有与其它算法相同的样本量（新记录交给结算流程统一结算）。
+    """
+    have = {r["target"] for r in box["history"]}
+    issues = set()
+    for aid, _name, _desc in ALGOS:
+        if aid == CONSENSUS_ID:
+            continue
+        for rec in (st["algos"].get(aid) or {}).get("history", []):
+            issues.add(rec["target"])
+    added = False
+    for iss in sorted(issues):
+        if iss in have:
+            continue
+        votes = consensus_votes(st, iss)
+        if not votes:
+            continue
+        order = sorted(votes, key=lambda v: (-votes[v], v))[:10]   # 票多优先，同票按号码升序
+        box["history"].append({
+            "target": iss, "picks10": order, "method": "重复号码",
+            "notes": ["%d票" % votes[v] for v in order],
+            "settled": False, "hit": None, "created": "回填",
+        })
+        added = True
+    if added:
+        # 统一按往期顺序排列，保证前端"新→旧"的展示顺序正确
+        box["history"].sort(key=lambda r: r["target"])
+    return added
+
+
 def settle_algos(rows):
     """
-    7 套算法并行：结算各套到期的历史预测（含选一命中与十种玩法命中），
+    8 套算法并行：结算各套到期的历史预测（含选一命中与十种玩法命中），
     并为还没有下一期预测的算法各生成一条。返回每套的当前预测与滚动命中率。
+    其中"重复号码"是汇总其余算法的投票结果，故排在最后处理。
     """
     drawn = {r["code"]: r["nums"] for r in rows}
     next_issue = str(int(rows[-1]["code"]) + 1)
@@ -745,6 +798,9 @@ def settle_algos(rows):
     out = []
     for aid, name, desc in ALGOS:
         box = st["algos"].setdefault(aid, {"history": []})
+        # 重复号码：先用其余算法的往期推荐回填历史记录（随后由第 1 步统一结算）
+        if aid == CONSENSUS_ID and consensus_history(st, box):
+            changed = True
         # 第 1 步：结算该套算法已到期的预测
         for rec in box["history"]:
             if rec["target"] in drawn:
@@ -769,6 +825,7 @@ def settle_algos(rows):
                 cur = rec
                 break
         if cur is None:
+            notes = None          # 留空则按各算法逻辑自动生成标注；特殊算法可自行覆盖
             if aid == "ai":
                 # 优先复用主预测（predictions.json）中对同一期的推荐：
                 # 保证与主页"AI 预测"一致，且避免重复调用大模型导致接口超时
@@ -792,13 +849,23 @@ def settle_algos(rows):
                     else:
                         picks10 = ranked_numbers(rows)[:10]
                         m = "本地五维（未配置大模型）"
+            elif aid == CONSENSUS_ID:
+                # 重复号码：汇总其余算法对同一期的前 10 推荐，按票数取前 10
+                votes = consensus_votes(st, next_issue)
+                order = sorted(votes, key=lambda v: (-votes[v], v))
+                picks10 = order[:10]
+                if len(picks10) < 10:      # 票数不足 10 个时，用本地评分补齐
+                    picks10 += [v for v in ranked_numbers(rows)
+                                if v not in picks10][:10 - len(picks10)]
+                m = name
+                notes = ["%d票" % votes.get(v, 0) for v in picks10]
             else:
                 stat = algo_stats(rows)
                 picks10 = algo_rank(rows, aid, stat)[:10]
                 m = name
             # 每个号码附该算法独立逻辑的标注，供前端 UI 展示
             cur = {"target": next_issue, "picks10": picks10, "method": m,
-                   "notes": algo_notes(rows, aid, picks10),
+                   "notes": notes if notes else algo_notes(rows, aid, picks10),
                    "settled": False, "hit": None,
                    "created": time.strftime("%Y-%m-%d %H:%M:%S")}
             box["history"].append(cur)
