@@ -3,16 +3,25 @@
  *       如需真正的访问控制，请改用 Cloudflare Pages + 邮箱白名单（详见 README.md）
  */
 (function () {
-  var PWD = '12345678';        // ← 访问口令，改成你自己的（改完需重新提交推送）
-  var FLAG = 'kl8_gate_v1';    // 本机记住"已通过"的标记名
+  var FLAG = 'kl8_gate_v1';    // 本机记住"今日已通过"的标记名（按日期区分，隔天需重新输入）
+
+  // 每日动态口令：年月日各取两位，如 2026-11-12 → 261112，次日自动变为 261113
+  function dailyPwd() {
+    var d = new Date();
+    var yy = String(d.getFullYear()).slice(2);
+    var mm = ('0' + (d.getMonth() + 1)).slice(-2);
+    var dd = ('0' + d.getDate()).slice(-2);
+    return yy + mm + dd;
+  }
+  var PWD = dailyPwd();
 
 
   var passed = false;
   // 本机调试（本地服务或直接打开文件）不拦，避免自己每次都要输口令
   if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) || location.protocol === 'file:') return;
 
-  try { passed = localStorage.getItem(FLAG) === '1'; } catch (e) { /* 隐私模式下会失败，按未通过处理 */ }
-  if (passed) return;          // 已通过过：直接显示页面
+  try { passed = localStorage.getItem(FLAG) === PWD; } catch (e) { /* 隐私模式下会失败，按未通过处理 */ }
+  if (passed) return;          // 今日已通过：直接显示页面
 
   // 未通过：先把整页藏起来，避免内容一闪而过
   document.documentElement.style.visibility = 'hidden';
@@ -45,7 +54,7 @@
     // 校验口令：正确则记住并移除遮罩，错误则提示
     function submit() {
       if (input.value.trim() === PWD) {
-        try { localStorage.setItem(FLAG, '1'); } catch (e) {}
+        try { localStorage.setItem(FLAG, PWD); } catch (e) {}
         box.remove();
         document.documentElement.style.visibility = 'visible';
       } else {

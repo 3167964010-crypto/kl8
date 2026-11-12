@@ -65,13 +65,19 @@ python sync_server.py
 
 ## 六、访问口令
 
-`gate.js` 顶部有一个口令常量：
+`gate.js` 里的口令按当天日期自动生成（年月日各取两位）：
 
 ```js
-var PWD = 'kl8-2026';   // 改成你自己的口令
+// 2026-11-12 → 261112，次日自动变为 261113
+function dailyPwd() {
+  var d = new Date();
+  return String(d.getFullYear()).slice(2) +
+         ('0' + (d.getMonth() + 1)).slice(-2) +
+         ('0' + d.getDate()).slice(-2);
+}
 ```
 
-改完提交推送，线上生效；本机记住过一次后不再询问（清浏览器缓存可重新验证）。
+不需要手动改口令；浏览器会记住"今天已通过"，隔天打开需重新输入当天日期（如 `261113`）。
 
 需要说明：这是**前端口令**，能挡住随手打开的人，但懂技术的人查看源码仍可绕过。
 如果要真正的访问控制，可以换到 Cloudflare Pages 并使用 Cloudflare Access（邮箱白名单，免费额度足够个人使用），代价是需要注册 Cloudflare 并重新部署一次。
