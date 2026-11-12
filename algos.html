@@ -213,6 +213,9 @@
   .bet-row.none{color:var(--muted);font-size:11px;border-bottom:none;}
   .bet-idx{flex:0 0 14px;text-align:right;color:var(--muted);font-size:10px;}
   .bet-num{display:inline-block;min-width:21px;font-variant-numeric:tabular-nums;}
+  /* 中奖档位小字 + 单注"中几个"标签 */
+  .tier-line{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.6;}
+  .bet-tier{margin-left:auto;font-size:10px;color:#8a5a12;font-weight:700;}
   .ten-grid{grid-template-columns:repeat(auto-fill,minmax(290px,1fr));}
   @media (max-width:640px){.ten-grid{grid-template-columns:1fr;}.bet-row{font-size:11px;}}
   ::-webkit-scrollbar-thumb{background:rgba(109,90,156,.28);}
@@ -235,8 +238,9 @@
   <div class="card" id="algoCard"><div class="dim">加载中…</div></div>
 
   <div class="note">
-    <strong>使用方法：</strong>每期开奖后，各套算法各自自动生成下一期预测（选一至选十取排序前 n 个），
+    <strong>使用方法：</strong>每期开奖后，各套算法各自自动生成下一期预测（每种玩法各 10 注：按排序滑窗取号），
     开奖后自动结算。观察若干期后，对比各套的滚动命中率，再决定主用哪一套。
+    <strong>命中率口径：</strong>"10 注命中率"= 拿到任意奖金的注数 ÷ 总注数；中奖档位里的"全不中"指一个号都没中（福彩选七~选十返 2 元），也计入中奖注。
     <strong>上期规律算法：</strong>以上一期开出的 20 个号码为基准打分——重号（上期开出）权重最高，其次是上期号码的邻号（±1），再次是同尾号，其余号码作为补位按号码顺序补齐。
     <strong>随机对照组是基准线</strong>：任何算法若长期跑不赢它，说明该算法没有实际效力。
     选一的理论命中率为 25%，各算法命中率围绕它波动属正常现象。
@@ -459,12 +463,24 @@ function playWins(rec, n) {
     return prizeAmount(n, k) > 0;
   });
 }
-// 渲染一组"10 注"行；win=true 时用中奖样式（金色打勾）
-function betRows(list, win) {
+// 把各中奖档位的注数整理成一行文字（0 档 = 一个都没中，福彩返 2 元）
+function tierText(tiers) {
+  if (!tiers) return '—';
+  var keys = Object.keys(tiers).filter(function (k) { return tiers[k] > 0; })
+    .sort(function (a, b) { return Number(b) - Number(a); });
+  if (!keys.length) return '暂无中奖';
+  return keys.map(function (k) {
+    return (k === '0' ? '全不中' : '中' + k) + ' ' + tiers[k] + ' 注';
+  }).join(' · ');
+}
+// 渲染一组"10 注"行；win=true 时用中奖样式，传入开奖号码则标出该注是"中几个"
+function betRows(list, win, act) {
   return list.map(function (b, i) {
+    var k = act ? b.filter(function (x) { return act.indexOf(x) >= 0; }).length : null;
     return '<div class="bet-row' + (win ? ' win' : '') + '"><span class="bet-idx">' +
       (win ? '✓' : (i + 1)) + '</span>' +
       b.map(function (x) { return '<span class="bet-num">' + pad(x) + '</span>'; }).join('') +
+      (k === null ? '' : '<span class="bet-tier">' + (k === 0 ? '全不中' : '中' + k) + '</span>') +
       '</div>';
   }).join('');
 }
@@ -494,7 +510,7 @@ function renderAlgo() {
       '</span><span class="ten-count">共 10 注</span>' + copyBtnHTML(list) + '</div>' +
       '<div class="bet-list">' + betRows(list) + '</div>' +
       '<div class="ten-row"><span>10 注命中率</span><b>' + prTxt + '</b></div>' +
-      '<div class="ten-row"><span>中奖注数</span><b>' + (pr.win || 0) + ' / ' + (pr.cnt || 0) + '</b></div></div>';
+      '<div class="tier-line">中奖档位：' + tierText(pr.tiers) + '</div></div>';
   }).join('');
   // 最近一期开奖对照：每种玩法 10 注里哪些注中奖（金色）
   var lastRec = (a.history || []).filter(function (r) { return r.settled && r.actual && r.bets; })[0];
@@ -509,9 +525,9 @@ function renderAlgo() {
         var total = ((lastRec.bets || {})[String(n)] || []).length;
         return '<div class="ten-card"><div class="ten-title"><span style="color:' + c + ';">选' + cn[n - 1] +
           '</span><span class="ten-count">中 ' + wins.length + ' / ' + total + ' 注</span></div>' +
-          (wins.length ? betRows(wins, true) : '<div class="bet-row none">本期未中奖</div>') +
+          (wins.length ? betRows(wins, true, lastRec.actual) : '<div class="bet-row none">本期未中奖</div>') +
           '<div class="ten-row"><span>累计命中率</span><b>' + prTxt + '</b></div>' +
-          '<div class="ten-row"><span>中奖注数</span><b>' + (pr.win || 0) + ' / ' + (pr.cnt || 0) + '</b></div></div>';
+          '<div class="tier-line">中奖档位：' + tierText(pr.tiers) + '</div></div>';
       }).join('') + '</div>';
   }
   // 滚动命中率

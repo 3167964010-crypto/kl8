@@ -320,6 +320,8 @@
   .bet-row:last-child{border-bottom:none;}
   .bet-idx{flex:0 0 14px;text-align:right;color:var(--muted);font-size:10px;}
   .bet-num{display:inline-block;min-width:21px;font-variant-numeric:tabular-nums;color:var(--ink);}
+  /* 中奖档位一行小字：中9 0 注 · 中8 1 注 … */
+  .tier-line{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.6;}
   /* 每格需放下 10 注，桌面端自动两列左右，手机单列 */
   .ten-grid{grid-template-columns:repeat(auto-fill,minmax(290px,1fr));}
   @media (max-width:640px){.ten-grid{grid-template-columns:1fr;}.bet-row{font-size:11px;}}
@@ -1077,9 +1079,8 @@ function renderPredict(p) {
     buildTenGrid(cur.picks10 || [], function (n) {
       var b = btMap[n] || {};
       var betTxt = (b.bet_rate === undefined) ? '—' : b.bet_rate.toFixed(1) + '%';
-      var winTxt = (b.bet_win || 0) + ' / ' + (b.bet_cnt || 0);
       return '<div class="ten-row"><span>10 注命中率</span><b>' + betTxt + '</b></div>' +
-        '<div class="ten-row"><span>中奖注数（近 ' + (b.window || 30) + ' 期）</span><b>' + winTxt + '</b></div>' +
+        '<div class="tier-line">中奖档位：' + tierText(b.tiers) + '</div>' +
         '<div class="ten-row"><span>单注理论中奖率</span><b>' + (b.theo_rate || 0).toFixed(2) + '%</b></div>' +
         '<div class="ten-row"><span>回测平均命中</span><b>' + (b.avg_hit || 0) + ' 个</b></div>';
     }, cur.bets) +
@@ -1097,6 +1098,16 @@ function renderPredict(p) {
   }
 }
 
+// 把各中奖档位的注数整理成一行文字（0 档 = 一个都没中，福彩返 2 元）
+function tierText(tiers) {
+  if (!tiers) return '—';
+  var keys = Object.keys(tiers).filter(function (k) { return tiers[k] > 0; })
+    .sort(function (a, b) { return Number(b) - Number(a); });
+  if (!keys.length) return '暂无中奖';
+  return keys.map(function (k) {
+    return (k === '0' ? '全不中' : '中' + k) + ' ' + tiers[k] + ' 注';
+  }).join(' · ');
+}
 // 渲染十种玩法卡片：优先生成 10 注（betsMap）；旧快照没有 10 注时退回"取前 n 个"
 function buildTenGrid(picks10, footFn, betsMap) {
   var cn = '一二三四五六七八九十';

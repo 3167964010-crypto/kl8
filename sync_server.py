@@ -340,7 +340,7 @@ def backtest10(rows, window=30):
     统计每种玩法的平均命中数、单注回测中奖率，以及"10 注玩法"的注级命中率。
     """
     start = max(20, len(rows) - window)          # 至少保留 20 期历史用于打分
-    agg = {n: {"hits": 0, "prize": 0, "cnt": 0, "bet_win": 0, "bet_cnt": 0}
+    agg = {n: {"hits": 0, "prize": 0, "cnt": 0, "bet_win": 0, "bet_cnt": 0, "tiers": {}}
            for n in range(1, 11)}
     for i in range(start, len(rows)):
         ranked = ranked_numbers(rows[:i])        # 该期之前的数据生成的排序
@@ -352,11 +352,13 @@ def backtest10(rows, window=30):
             a["cnt"] += 1
             if prize_hit(n, k):
                 a["prize"] += 1
-            # 10 注玩法：逐注判断是否中奖，统计注级命中率
+            # 10 注玩法：逐注判断是否中奖，统计注级命中率与各中奖档位
             for bet in play_bets(ranked, n):
                 a["bet_cnt"] += 1
-                if prize_hit(n, len(set(bet) & actual)):
+                bk = len(set(bet) & actual)
+                if prize_hit(n, bk):
                     a["bet_win"] += 1
+                    a["tiers"][str(bk)] = a["tiers"].get(str(bk), 0) + 1
     out = []
     for n in range(1, 11):
         a = agg[n]
@@ -367,6 +369,7 @@ def backtest10(rows, window=30):
             "bet_rate": round(a["bet_win"] / a["bet_cnt"] * 100, 1) if a["bet_cnt"] else 0,
             "bet_win": a["bet_win"],
             "bet_cnt": a["bet_cnt"],
+            "tiers": a["tiers"],                 # 各中奖档位注数（含"全不中返 2 元"的 0 档）
             "window": len(rows) - start,         # 实际回测期数
             "theo_rate": round(theo_prize_prob(n) * 100, 2),
         })
@@ -940,13 +943,16 @@ def settle_algos(rows):
         play_rates = {}
         for n in range(1, 11):
             win = cnt = 0
+            tiers = {}                                  # 各中奖档位（中 k 个）对应的注数
             for r in settled:
                 act = drawn.get(r["target"]) or set(r.get("actual") or [])
                 for bet in ((r.get("bets") or {}).get(str(n)) or []):
                     cnt += 1
-                    if prize_amount(n, len(set(bet) & act)) > 0:
+                    k = len(set(bet) & act)
+                    if prize_amount(n, k) > 0:
                         win += 1
-            play_rates[str(n)] = {"win": win, "cnt": cnt,
+                        tiers[str(k)] = tiers.get(str(k), 0) + 1
+            play_rates[str(n)] = {"win": win, "cnt": cnt, "tiers": tiers,
                                   "rate": round(win / cnt * 100, 1) if cnt else None}
         cost = len(settled) * 20                            # 每期 10 种玩法各 1 注 = 20 元
         prize = round(sum(r.get("prize_total", 0) for r in settled), 2)
