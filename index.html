@@ -1079,8 +1079,8 @@ function renderPredict(p) {
     buildTenGrid(cur.picks10 || [], function (n) {
       var b = btMap[n] || {};
       var betTxt = (b.bet_rate === undefined) ? '—' : b.bet_rate.toFixed(1) + '%';
-      return '<div class="ten-row"><span>10 注命中率</span><b>' + betTxt + '</b></div>' +
-        '<div class="tier-line">中奖档位：' + tierText(b.tiers) + '</div>' +
+      return '<div class="ten-row"><span>10 注命中率（' + (b.bet_win || 0) + '/' + (b.bet_cnt || 0) + '）</span><b>' + betTxt + '</b></div>' +
+        '<div class="tier-line">累计中奖档位（' + (b.window || 30) + ' 期）：' + tierText(b.tiers) + '</div>' +
         '<div class="ten-row"><span>单注理论中奖率</span><b>' + (b.theo_rate || 0).toFixed(2) + '%</b></div>' +
         '<div class="ten-row"><span>回测平均命中</span><b>' + (b.avg_hit || 0) + ' 个</b></div>';
     }, cur.bets) +

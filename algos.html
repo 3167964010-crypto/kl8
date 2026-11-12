@@ -509,8 +509,8 @@ function renderAlgo() {
     return '<div class="ten-card"><div class="ten-title"><span style="color:' + c + ';">选' + cn[n - 1] +
       '</span><span class="ten-count">共 10 注</span>' + copyBtnHTML(list) + '</div>' +
       '<div class="bet-list">' + betRows(list) + '</div>' +
-      '<div class="ten-row"><span>10 注命中率</span><b>' + prTxt + '</b></div>' +
-      '<div class="tier-line">中奖档位：' + tierText(pr.tiers) + '</div></div>';
+      '<div class="ten-row"><span>10 注命中率（' + (pr.win || 0) + '/' + (pr.cnt || 0) + '）</span><b>' + prTxt + '</b></div>' +
+      '<div class="tier-line">累计中奖档位（' + Math.round((pr.cnt || 0) / 10) + ' 期）：' + tierText(pr.tiers) + '</div></div>';
   }).join('');
   // 最近一期开奖对照：每种玩法 10 注里哪些注中奖（金色）
   var lastRec = (a.history || []).filter(function (r) { return r.settled && r.actual && r.bets; })[0];
@@ -527,7 +527,7 @@ function renderAlgo() {
           '</span><span class="ten-count">中 ' + wins.length + ' / ' + total + ' 注</span></div>' +
           (wins.length ? betRows(wins, true, lastRec.actual) : '<div class="bet-row none">本期未中奖</div>') +
           '<div class="ten-row"><span>累计命中率</span><b>' + prTxt + '</b></div>' +
-          '<div class="tier-line">中奖档位：' + tierText(pr.tiers) + '</div></div>';
+          '<div class="tier-line">累计中奖档位（' + Math.round((pr.cnt || 0) / 10) + ' 期）：' + tierText(pr.tiers) + '</div></div>';
       }).join('') + '</div>';
   }
   // 滚动命中率
