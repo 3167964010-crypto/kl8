@@ -1071,18 +1071,22 @@ function renderPredict(p) {
   el.innerHTML =
     '<div class="ai-cur">' +
       '<div><div class="bt-dim">第 ' + (cur.target_issue || '—') + ' 期预测（基于第 ' + (cur.based_on || '—') + ' 期数据生成）</div>' +
-      '<div class="bt-dim" style="margin-top:4px;font-size:11px">每个玩法各推 10 注（按推荐度滑窗取号），命中率按逐注回测统计</div></div>' +
+      '<div class="bt-dim" style="margin-top:4px;font-size:11px">每个玩法各推 10 注（按推荐度滑窗取号），命中率按上一期这 10 注的实际开奖结果统计</div></div>' +
       '<div class="ai-side"><div class="ai-logic">' + (cur.logic || '') + '</div>' +
       '<div class="bt-dim">模型：' + (cur.method || '') + ' · 输入模型的数据样本：' + (cur.ctx || '—') + ' 期开奖数据</div></div>' +
     '</div>' +
     '<div class="ai-rate">滚动命中率：' + rateTxt + '</div>' +
     buildTenGrid(cur.picks10 || [], function (n) {
       var b = btMap[n] || {};
-      var betTxt = (b.bet_rate === undefined) ? '—' : b.bet_rate.toFixed(1) + '%';
-      return '<div class="ten-row"><span>10 注命中率（' + (b.bet_win || 0) + '/' + (b.bet_cnt || 0) + '）</span><b>' + betTxt + '</b></div>' +
-        '<div class="tier-line">累计中奖档位（' + (b.window || 30) + ' 期）：' + tierText(b.tiers) + '</div>' +
-        '<div class="ten-row"><span>单注理论中奖率</span><b>' + (b.theo_rate || 0).toFixed(2) + '%</b></div>' +
-        '<div class="ten-row"><span>回测平均命中</span><b>' + (b.avg_hit || 0) + ' 个</b></div>';
+      var lp = (p.last_play && p.last_play.plays) ? p.last_play.plays[String(n)] : null;
+      // 当期口径：只看最近一期这 10 注的实际结果，不做往期累计
+      var perTxt = lp
+        ? '<div class="ten-row"><span>上一期（第 ' + p.last_play.issue + ' 期）10 注</span><b>中 ' +
+          lp.win + ' / ' + lp.cnt + ' 注（' + (lp.cnt ? Math.round(lp.win / lp.cnt * 100) : 0) + '%）</b></div>' +
+          '<div class="tier-line">该期档位：' + tierText(lp.tiers) + '</div>'
+        : '<div class="ten-row"><span>当期 10 注</span><b>待开奖</b></div>';
+      return perTxt +
+        '<div class="ten-row"><span>单注理论中奖率</span><b>' + (b.theo_rate || 0).toFixed(2) + '%</b></div>';
     }, cur.bets) +
     '<div class="bt-detail" style="max-height:none">' + histHtml + '</div>';
   bindCopyButtons(el);          // 十种玩法格子与历史预测行上的复制按钮统一绑定

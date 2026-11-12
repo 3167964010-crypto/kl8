@@ -484,6 +484,19 @@ function betRows(list, win, act) {
       '</div>';
   }).join('');
 }
+// 当期口径：某期某玩法这 10 注里中奖注数与各档位（不做往期累计）
+function periodStats(bets, actual, n) {
+  if (!bets || !actual) return null;
+  var win = 0, tiers = {};
+  bets.forEach(function (b) {
+    var k = b.filter(function (x) { return actual.indexOf(x) >= 0; }).length;
+    if (prizeAmount(n, k) > 0) {
+      win++;
+      tiers[String(k)] = (tiers[String(k)] || 0) + 1;
+    }
+  });
+  return { win: win, cnt: bets.length, tiers: tiers };
+}
 function renderAlgo() {
   var a = DATA.algos.filter(function (x) { return x.id === ACTIVE; })[0];
   var cur = a.current || { picks10: [] };
@@ -494,10 +507,10 @@ function renderAlgo() {
     return '<span class="pball">' + ball(x, true) +
       '<i>' + (cur.notes && cur.notes[i] ? cur.notes[i] : '') + '</i></span>';
   }).join('');
+  // 最近一期已开奖记录：卡片上的命中率只按"这一期的 10 注"统计
+  var lastRec = (a.history || []).filter(function (r) { return r.settled && r.actual && r.bets; })[0];
   // 选一~选十窗口：每种玩法 10 注（旧快照没有 bets 时退回"取前 n 个"）
   var grid = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (n) {
-    var pr = (a.play_rates || {})[String(n)] || {};
-    var prTxt = (pr.rate === null || pr.rate === undefined) ? '—' : pr.rate + '%';
     var list = cur.bets && cur.bets[String(n)];
     if (!list || !list.length) {
       var nums = cur.picks10.slice(0, n);
@@ -506,28 +519,30 @@ function renderAlgo() {
         '</span>' + copyBtnHTML(nums) + '</div>' +
         '<div class="ten-balls">' + (balls || '—') + '</div></div>';
     }
+    // 当期结果：上一期这 10 注实际中了几注（未开奖则显示待开奖）
+    var per = lastRec ? periodStats(list, lastRec.actual, n) : null;
+    var foot = per
+      ? '<div class="ten-row"><span>上一期（第 ' + lastRec.target + ' 期）10 注</span><b>中 ' +
+        per.win + ' / ' + per.cnt + ' 注（' + Math.round(per.win / per.cnt * 100) + '%）</b></div>' +
+        '<div class="tier-line">该期档位：' + tierText(per.tiers) + '</div>'
+      : '<div class="ten-row"><span>当期 10 注</span><b>待开奖</b></div>';
     return '<div class="ten-card"><div class="ten-title"><span style="color:' + c + ';">选' + cn[n - 1] +
       '</span><span class="ten-count">共 10 注</span>' + copyBtnHTML(list) + '</div>' +
-      '<div class="bet-list">' + betRows(list) + '</div>' +
-      '<div class="ten-row"><span>10 注命中率（' + (pr.win || 0) + '/' + (pr.cnt || 0) + '）</span><b>' + prTxt + '</b></div>' +
-      '<div class="tier-line">累计中奖档位（' + Math.round((pr.cnt || 0) / 10) + ' 期）：' + tierText(pr.tiers) + '</div></div>';
+      '<div class="bet-list">' + betRows(list) + '</div>' + foot + '</div>';
   }).join('');
   // 最近一期开奖对照：每种玩法 10 注里哪些注中奖（金色）
-  var lastRec = (a.history || []).filter(function (r) { return r.settled && r.actual && r.bets; })[0];
   var winSection = '';
   if (lastRec) {
     winSection = '<div class="dim" style="margin-top:16px;">第 ' + lastRec.target +
       ' 期开奖对照（金色 = 该玩法中奖的注）：</div><div class="ten-grid">' +
       [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (n) {
         var wins = playWins(lastRec, n);
-        var pr = (a.play_rates || {})[String(n)] || {};
-        var prTxt = (pr.rate === null || pr.rate === undefined) ? '—' : pr.rate + '%';
         var total = ((lastRec.bets || {})[String(n)] || []).length;
+        var per = periodStats((lastRec.bets || {})[String(n)] || [], lastRec.actual, n);
         return '<div class="ten-card"><div class="ten-title"><span style="color:' + c + ';">选' + cn[n - 1] +
           '</span><span class="ten-count">中 ' + wins.length + ' / ' + total + ' 注</span></div>' +
           (wins.length ? betRows(wins, true, lastRec.actual) : '<div class="bet-row none">本期未中奖</div>') +
-          '<div class="ten-row"><span>累计命中率</span><b>' + prTxt + '</b></div>' +
-          '<div class="tier-line">累计中奖档位（' + Math.round((pr.cnt || 0) / 10) + ' 期）：' + tierText(pr.tiers) + '</div></div>';
+          '<div class="tier-line">该期档位：' + tierText(per ? per.tiers : null) + '</div></div>';
       }).join('') + '</div>';
   }
   // 滚动命中率

@@ -458,6 +458,7 @@ def settle_and_predict():
 
     state = load_predictions()
     changed = False
+    pos = {r["code"]: i for i, r in enumerate(rows)}   # 期号 -> 在 rows 里的下标
 
     # 第 1 步：结算已到期的预测（含十种玩法各自命中数）
     for rec in state["history"]:
@@ -465,9 +466,16 @@ def settle_and_predict():
             actual = drawn[rec["target_issue"]]
             rec["settled"] = True
             rec["hit"] = rec["pick"] in actual
+            rec["actual"] = sorted(actual)            # 记录开奖号码，供"当期 10 注"统计
             if rec.get("picks10"):
                 rec["hits10"] = {str(n): len(set(rec["picks10"][:n]) & actual)
                                  for n in range(1, 11)}
+                # 用该期之前的数据复现当期 10 注，开奖后即可逐注结算
+                idx = pos.get(rec["target_issue"])
+                if idx is not None:
+                    order = list(rec["picks10"]) + [x for x in ranked_numbers(rows[:idx])
+                                                    if x not in rec["picks10"]]
+                    rec["bets"] = {str(n): play_bets(order, n) for n in range(1, 11)}
             changed = True
 
     # 第 2 步：生成下一期预测（每期只生成一次）
@@ -539,6 +547,37 @@ def settle_and_predict():
                 current["bets"] = bets
                 changed = True
 
+    # 迁移：已结算但缺"当期 10 注 / 开奖号码"的旧记录，用该期之前的数据补算
+    for rec in state["history"]:
+        if rec.get("settled") and rec.get("picks10") and (not rec.get("bets") or not rec.get("actual")):
+            iss = rec["target_issue"]
+            idx = pos.get(iss)
+            if idx is not None and iss in drawn:
+                rec["actual"] = sorted(drawn[iss])
+                order = list(rec["picks10"]) + [x for x in ranked_numbers(rows[:idx])
+                                                if x not in rec["picks10"]]
+                rec["bets"] = {str(n): play_bets(order, n) for n in range(1, 11)}
+                changed = True
+
+    # 最近一期已开奖的"当期 10 注"逐注结果（当期口径，卡片只展示这一期）
+    last_play = None
+    for rec in sorted((r for r in state["history"]
+                       if r.get("settled") and r.get("bets") and r.get("actual")),
+                      key=lambda r: r["target_issue"], reverse=True):
+        act = set(rec["actual"])
+        plays = {}
+        for n in range(1, 11):
+            bets = (rec.get("bets") or {}).get(str(n)) or []
+            win, tiers = 0, {}
+            for bet in bets:
+                k = len(set(bet) & act)
+                if prize_amount(n, k) > 0:
+                    win += 1
+                    tiers[str(k)] = tiers.get(str(k), 0) + 1
+            plays[str(n)] = {"win": win, "cnt": len(bets), "tiers": tiers}
+        last_play = {"issue": rec["target_issue"], "plays": plays}
+        break
+
     if changed:
         save_predictions(state)
 
@@ -548,6 +587,7 @@ def settle_and_predict():
     return {
         "state": 0,
         "current": current,                           # 当前（下一期）预测
+        "last_play": last_play,                       # 最近一期的当期 10 注结果
         "history": list(reversed(state["history"])),  # 全部记录，最新在前
         "total": len(settled),                        # 已结算次数
         "hits": hits,                                 # 命中次数
