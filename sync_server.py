@@ -316,6 +316,24 @@ def play_bets(ranked, n, count=10):
     return [pool[i:i + n] for i in range(count)]
 
 
+def algo_order(rows, aid, stat, picks10):
+    """
+    把某套算法的前 10 推荐扩展成完整排序，供"每玩法 10 注"取号使用。
+    前 10 保持该算法当期推荐，其余号码按同一套算法评分补齐。
+    """
+    if aid == "ai":
+        base = ranked_numbers(rows)
+    elif aid == CONSENSUS_ID:
+        base = list(picks10) + ranked_numbers(rows)
+    else:
+        base = algo_rank(rows, aid, stat)
+    order = list(picks10)
+    for x in base:
+        if x not in order:
+            order.append(x)
+    return order
+
+
 def backtest10(rows, window=30):
     """
     十种玩法滚动回测：对最近 window 期逐期模拟（只用该期之前的数据打分取排序），
@@ -822,6 +840,7 @@ def settle_algos(rows):
     其中"重复号码"是汇总其余算法的投票结果，故排在最后处理。
     """
     drawn = {r["code"]: r["nums"] for r in rows}
+    pos = {r["code"]: i for i, r in enumerate(rows)}   # 期号 → 在 rows 中的位置（取"开奖前"历史用）
     next_issue = str(int(rows[-1]["code"]) + 1)
     st = load_json(ALGO_FILE, {"algos": {}})
     changed = False
@@ -838,6 +857,15 @@ def settle_algos(rows):
                 actual = drawn[rec["target"]]
                 if "actual" not in rec:
                     rec["actual"] = sorted(actual)      # 记录实际开奖号码，供前端对照展示
+                    changed = True
+                # 每玩法 10 注：只用以该期之前的数据重算排序再滑窗取号，
+                # 方便开奖后在本期记录上展示每个玩法的中奖号码
+                if "bets" not in rec:
+                    before = rows[:pos.get(rec["target"], len(rows))]
+                    if len(before) < 20:
+                        before = rows[:20]
+                    order = algo_order(before, aid, algo_stats(before), rec["picks10"])
+                    rec["bets"] = {str(n): play_bets(order, n) for n in range(1, 11)}
                     changed = True
                 if not rec.get("settled"):
                     rec["settled"] = True
@@ -901,8 +929,25 @@ def settle_algos(rows):
                    "created": time.strftime("%Y-%m-%d %H:%M:%S")}
             box["history"].append(cur)
             changed = True
+        # 当前预测也要有"每玩法 10 注"：前 10 用本算法推荐，其余号码按同算法评分补齐
+        if cur is not None and "bets" not in cur:
+            order = algo_order(rows, aid, algo_stats(rows), cur.get("picks10") or [])
+            cur["bets"] = {str(n): play_bets(order, n) for n in range(1, 11)}
+            changed = True
         settled = [r for r in box["history"] if r.get("settled")]
         hits = sum(1 for r in settled if r.get("hit"))
+        # 各玩法 10 注的注级命中率：命中注数 / 总注数（按已结算期统计）
+        play_rates = {}
+        for n in range(1, 11):
+            win = cnt = 0
+            for r in settled:
+                act = drawn.get(r["target"]) or set(r.get("actual") or [])
+                for bet in ((r.get("bets") or {}).get(str(n)) or []):
+                    cnt += 1
+                    if prize_amount(n, len(set(bet) & act)) > 0:
+                        win += 1
+            play_rates[str(n)] = {"win": win, "cnt": cnt,
+                                  "rate": round(win / cnt * 100, 1) if cnt else None}
         cost = len(settled) * 20                            # 每期 10 种玩法各 1 注 = 20 元
         prize = round(sum(r.get("prize_total", 0) for r in settled), 2)
         out.append({
@@ -911,6 +956,7 @@ def settle_algos(rows):
             "rate": round(hits / len(settled) * 100, 2) if settled else None,
             "cost": cost, "prize": prize,
             "net": round(prize - cost, 2),                  # 累计盈亏
+            "play_rates": play_rates,                       # 每玩法 10 注的命中率
             "history": list(reversed(box["history"])),
         })
     if changed:

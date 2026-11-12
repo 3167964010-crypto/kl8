@@ -203,6 +203,18 @@
   /* 轻提示：暖白卡片 */
   .toast{background:rgba(250,247,241,.98);color:var(--ink);border-color:rgba(154,106,26,.32);
          box-shadow:0 8px 24px rgba(90,76,58,.16);}
+  /* === 十玩法 10 注展示：每注一行，中奖注金色高亮 === */
+  .ten-count{font-size:10.5px;color:var(--muted);font-weight:400;margin-left:4px;}
+  .bet-list{margin:6px 0;}
+  .bet-row{display:flex;align-items:center;gap:4px;font-size:11.5px;line-height:1.9;
+           border-bottom:1px dashed var(--rule);padding:1px 0;}
+  .bet-row:last-child{border-bottom:none;}
+  .bet-row.win{color:#8a5a12;background:rgba(154,106,26,.10);border-radius:4px;}
+  .bet-row.none{color:var(--muted);font-size:11px;border-bottom:none;}
+  .bet-idx{flex:0 0 14px;text-align:right;color:var(--muted);font-size:10px;}
+  .bet-num{display:inline-block;min-width:21px;font-variant-numeric:tabular-nums;}
+  .ten-grid{grid-template-columns:repeat(auto-fill,minmax(290px,1fr));}
+  @media (max-width:640px){.ten-grid{grid-template-columns:1fr;}.bet-row{font-size:11px;}}
   ::-webkit-scrollbar-thumb{background:rgba(109,90,156,.28);}
   ::-webkit-scrollbar-track{background:rgba(58,53,46,.06);}
 </style>
@@ -356,11 +368,15 @@ function showToast(text) {
 }
 
 // 复制一组号码：优先 Clipboard API，不可用时用临时文本框兜底
+// 支持多注：[[1,2],[3,4]] 会按"每注一行"复制
 function copyNums(nums, btn) {
-  var text = (nums || []).map(function (n) { return pad(n); }).join(' ');
+  var multi = (nums || []).some(function (x) { return Array.isArray(x); });
+  var text = (nums || []).map(function (n) {
+    return Array.isArray(n) ? n.map(function (v) { return pad(v); }).join(' ') : pad(n);
+  }).join('\n');
   if (!text) return;
   function done() {
-    showToast('已复制：' + text);
+    showToast(multi ? '已复制 ' + nums.length + ' 注号码' : '已复制：' + text);
     if (btn) {
       btn.classList.add('done');
       var old = btn.textContent;
@@ -427,7 +443,31 @@ function streakInfo(hist) {
   };
 }
 
-// 渲染当前选中算法的详细内容（独立逻辑标注 + 奖金对照）
+// 单注奖金（元）：查官方奖金表，未中奖返回 0
+function prizeAmount(n, k) {
+  var t = (DATA.prize_table || {})[String(n)] || {};
+  return Number(t[String(k)] || 0);
+}
+// 某期某玩法里中奖的注（返回号码数组的数组）
+function playWins(rec, n) {
+  if (!rec || !rec.bets) return [];
+  var list = rec.bets[String(n)] || [];
+  var act = rec.actual || [];
+  if (!list.length || !act.length) return [];
+  return list.filter(function (b) {
+    var k = b.filter(function (x) { return act.indexOf(x) >= 0; }).length;
+    return prizeAmount(n, k) > 0;
+  });
+}
+// 渲染一组"10 注"行；win=true 时用中奖样式（金色打勾）
+function betRows(list, win) {
+  return list.map(function (b, i) {
+    return '<div class="bet-row' + (win ? ' win' : '') + '"><span class="bet-idx">' +
+      (win ? '✓' : (i + 1)) + '</span>' +
+      b.map(function (x) { return '<span class="bet-num">' + pad(x) + '</span>'; }).join('') +
+      '</div>';
+  }).join('');
+}
 function renderAlgo() {
   var a = DATA.algos.filter(function (x) { return x.id === ACTIVE; })[0];
   var cur = a.current || { picks10: [] };
@@ -438,14 +478,42 @@ function renderAlgo() {
     return '<span class="pball">' + ball(x, true) +
       '<i>' + (cur.notes && cur.notes[i] ? cur.notes[i] : '') + '</i></span>';
   }).join('');
-  // 选一~选十窗口（附每种玩法的中奖数与金额对照）
+  // 选一~选十窗口：每种玩法 10 注（旧快照没有 bets 时退回"取前 n 个"）
   var grid = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (n) {
-    var nums = cur.picks10.slice(0, n);
-    var balls = nums.map(function (x) { return mini(x); }).join(' ');
+    var pr = (a.play_rates || {})[String(n)] || {};
+    var prTxt = (pr.rate === null || pr.rate === undefined) ? '—' : pr.rate + '%';
+    var list = cur.bets && cur.bets[String(n)];
+    if (!list || !list.length) {
+      var nums = cur.picks10.slice(0, n);
+      var balls = nums.map(function (x) { return mini(x); }).join(' ');
+      return '<div class="ten-card"><div class="ten-title"><span style="color:' + c + ';">选' + cn[n - 1] +
+        '</span>' + copyBtnHTML(nums) + '</div>' +
+        '<div class="ten-balls">' + (balls || '—') + '</div></div>';
+    }
     return '<div class="ten-card"><div class="ten-title"><span style="color:' + c + ';">选' + cn[n - 1] +
-      '</span>' + copyBtnHTML(nums) + '</div>' +
-      '<div class="ten-balls">' + (balls || '—') + '</div></div>';
+      '</span><span class="ten-count">共 10 注</span>' + copyBtnHTML(list) + '</div>' +
+      '<div class="bet-list">' + betRows(list) + '</div>' +
+      '<div class="ten-row"><span>10 注命中率</span><b>' + prTxt + '</b></div>' +
+      '<div class="ten-row"><span>中奖注数</span><b>' + (pr.win || 0) + ' / ' + (pr.cnt || 0) + '</b></div></div>';
   }).join('');
+  // 最近一期开奖对照：每种玩法 10 注里哪些注中奖（金色）
+  var lastRec = (a.history || []).filter(function (r) { return r.settled && r.actual && r.bets; })[0];
+  var winSection = '';
+  if (lastRec) {
+    winSection = '<div class="dim" style="margin-top:16px;">第 ' + lastRec.target +
+      ' 期开奖对照（金色 = 该玩法中奖的注）：</div><div class="ten-grid">' +
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (n) {
+        var wins = playWins(lastRec, n);
+        var pr = (a.play_rates || {})[String(n)] || {};
+        var prTxt = (pr.rate === null || pr.rate === undefined) ? '—' : pr.rate + '%';
+        var total = ((lastRec.bets || {})[String(n)] || []).length;
+        return '<div class="ten-card"><div class="ten-title"><span style="color:' + c + ';">选' + cn[n - 1] +
+          '</span><span class="ten-count">中 ' + wins.length + ' / ' + total + ' 注</span></div>' +
+          (wins.length ? betRows(wins, true) : '<div class="bet-row none">本期未中奖</div>') +
+          '<div class="ten-row"><span>累计命中率</span><b>' + prTxt + '</b></div>' +
+          '<div class="ten-row"><span>中奖注数</span><b>' + (pr.win || 0) + ' / ' + (pr.cnt || 0) + '</b></div></div>';
+      }).join('') + '</div>';
+  }
   // 滚动命中率
   var rateTxt = a.rate === null ? '暂无已结算记录（首期预测待开奖）'
     : '<b>' + a.rate + '%</b>（选一：已结算 ' + a.total + ' 期 · 命中 ' + a.hits + ' 期；理论基准 25%）';
@@ -488,8 +556,9 @@ function renderAlgo() {
     '<div class="pickline">' + pickline +
       '<button class="copy-btn" data-copy=\'' + JSON.stringify(cur.picks10 || []) + '\' style="align-self:center">复制前10</button>' +
     '</div>' +
-    '<div class="dim" style="margin-top:12px;">选 n 玩法取前 n 个号码：</div>' +
+    '<div class="dim" style="margin-top:12px;">每种玩法各 10 注（按本算法排序滑窗取号）：</div>' +
     '<div class="ten-grid">' + grid + '</div>' +
+    winSection +
     '<div class="dim" style="margin-top:12px;">历史对照：橙色 = 预测号码，紫色 = 开奖命中，灰色 = 开奖未中。</div>' +
     '<div class="bt-detail"><table><thead>' + histHead() + '</thead>' +
     '<tbody>' + rows + '</tbody></table></div>';
