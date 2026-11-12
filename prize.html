@@ -92,6 +92,35 @@
     th,td{padding:6px 8px;}
     .legend{font-size:11px;}
   }
+
+  /* === 清爽浅色主题：浅底 + 柔和阴影，减轻深色界面的压抑感 === */
+  :root{
+    --bg:#f5f8fd; --bg2:#ffffff; --ink:#1c2434; --muted:#68738a;
+    --rule:rgba(28,36,52,.10); --accent:#0284c7; --accent2:#7c3aed; --gold:#d97706;
+  }
+  body{background:
+         radial-gradient(900px 520px at 88% -12%, rgba(124,58,237,.10), transparent 62%),
+         radial-gradient(820px 500px at -8% 4%, rgba(2,132,199,.10), transparent 58%),
+         linear-gradient(180deg,#f8fafd 0%,#eef3fb 55%,#f8fafd 100%);
+       background-attachment:fixed;}
+  /* 标题：浅底改用实色渐变，去掉霓虹发光 */
+  .title{background:linear-gradient(90deg,#0369a1,#7c3aed);-webkit-background-clip:text;background-clip:text;}
+  .title small{-webkit-text-fill-color:#0284c7;}
+  /* 顶栏按钮与算法 Tab */
+  .navlink{border-color:rgba(2,132,199,.35);background:rgba(2,132,199,.06);}
+  .tab.on{box-shadow:0 2px 10px rgba(2,132,199,.18);}
+  .tab:hover{border-color:rgba(2,132,199,.40);}
+  /* 卡片与汇总格：白底 + 轻阴影 */
+  .card,.sum .item{background:#fff;box-shadow:0 1px 2px rgba(23,38,71,.04),0 8px 22px rgba(23,38,71,.05);}
+  /* 表头：浅蓝灰底 + 深字 */
+  th{background:#eef3fb;color:var(--ink);}
+  /* 金额正负色在浅底上加深，保证可读 */
+  .sum .item .num.plus{color:#0f9d6e;}
+  .sum .item .num.minus{color:#dc2626;}
+  .win{color:#b45309;}
+  .pending{color:#6d28d9;}
+  ::-webkit-scrollbar-thumb{background:rgba(2,132,199,.30);}
+  ::-webkit-scrollbar-track{background:rgba(23,38,71,.05);}
 </style>
 </head>
 <body>

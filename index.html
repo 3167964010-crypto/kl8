@@ -7,7 +7,7 @@
 <title>快乐8 预测台 · 官方数据自动同步</title>
 <!-- 添加到主屏幕与离线缓存配置 -->
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0a1020">
+<meta name="theme-color" content="#f5f8fd">
 <!-- 访问口令门禁：未通过时先隐藏页面 -->
 <script src="gate.js"></script>
 <style>
@@ -268,6 +268,51 @@
     .rec-line{gap:4px;font-size:11.5px;}
     footer{font-size:11px;}
   }
+  /* === 清爽浅色主题：浅底 + 柔和阴影，减轻深色界面的压抑感 === */
+  :root{
+    --bg:#f5f8fd; --bg2:#ffffff; --ink:#1c2434; --muted:#68738a;
+    --rule:rgba(28,36,52,.10); --accent:#0284c7; --accent2:#7c3aed; --gold:#d97706;
+  }
+  body{background:
+         radial-gradient(900px 520px at 88% -12%, rgba(124,58,237,.10), transparent 62%),
+         radial-gradient(820px 500px at -8% 4%, rgba(2,132,199,.10), transparent 58%),
+         linear-gradient(180deg,#f8fafd 0%,#eef3fb 55%,#f8fafd 100%);
+       background-attachment:fixed;}
+  /* 原本靠霓虹发光突出的文字改为实色深字，浅底上才不发虚 */
+  .title{background:linear-gradient(90deg,#0369a1,#7c3aed);-webkit-background-clip:text;background-clip:text;}
+  .title small{-webkit-text-fill-color:#0284c7;}
+  .issue,.rec-issue,.kpi .num,.ai-rate b,.ten-tier,.bt-hit,.dot{text-shadow:none;}
+  .issue{color:var(--ink);}
+  /* 卡片：白底 + 轻阴影，替代深色玻璃拟态 */
+  .card,.kpi,.pick,.ten-card{background:#fff;box-shadow:0 1px 2px rgba(23,38,71,.04),0 8px 22px rgba(23,38,71,.05);}
+  /* 号码球保留语义色，只把霓虹光晕换成柔和投影 */
+  .ball{box-shadow:0 2px 6px rgba(2,132,199,.28);}
+  .mini{box-shadow:0 1px 4px rgba(2,132,199,.25);}
+  .ball.gold,.mini.gold{box-shadow:0 2px 6px rgba(124,58,237,.28);}
+  .ball.gray,.mini.gray{box-shadow:none;}
+  /* 表格：浅蓝灰表头 + 白底 */
+  .table-wrap{background:#fff;}
+  th,.bt-detail th{background:#eef3fb;color:var(--ink);}
+  .bt-sum th{background:#f1f5fb;}
+  /* 浅底上把低对比度的强调色加深 */
+  .hit,.bt-hit,.copy-btn.done{color:#0f9d6e;border-color:rgba(15,157,110,.45);}
+  /* 复制按钮：白色底上把橙色加深，避免发灰看不清 */
+  .copy-btn{color:#b45309;border-color:rgba(217,119,6,.40);background:rgba(217,119,6,.08);}
+  .copy-btn:hover{background:rgba(217,119,6,.16);box-shadow:none;}
+  .copy-btn.done{background:rgba(15,157,110,.10);}
+  .chip{background:rgba(2,132,199,.10);border-color:rgba(2,132,199,.30);}
+  .chart-open,.btn-ghost,.next-draw{border-color:rgba(2,132,199,.35);background:rgba(2,132,199,.06);}
+  .btn,.seg button.on,.llm-actions button{box-shadow:0 2px 8px rgba(2,132,199,.28);}
+  .ten-card:hover{border-color:rgba(2,132,199,.35);box-shadow:0 4px 14px rgba(23,38,71,.10);}
+  .selfbox input,.llm-form input{background:#fff;color:var(--ink);border-color:var(--rule);}
+  .selfbox input:focus,.llm-form input:focus{box-shadow:0 0 0 3px rgba(2,132,199,.15);}
+  .bar{background:rgba(23,38,71,.08);}
+  .chart-frame{box-shadow:0 6px 18px rgba(23,38,71,.10);}
+  /* 轻提示改成浅色卡片，避免突然弹出黑块 */
+  .toast{background:rgba(255,255,255,.98);color:var(--ink);border-color:rgba(2,132,199,.35);
+         box-shadow:0 8px 26px rgba(23,38,71,.16);}
+  ::-webkit-scrollbar-thumb{background:rgba(2,132,199,.30);}
+  ::-webkit-scrollbar-track{background:rgba(23,38,71,.05);}
 </style>
 </head>
 <body>

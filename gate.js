@@ -22,19 +22,20 @@
     box.id = 'gateBox';
     box.style.cssText = [
       'position:fixed', 'inset:0', 'z-index:99999',
-      'background:radial-gradient(800px 420px at 50% 20%,rgba(0,229,255,.12),transparent 60%),#070b14',
+      'background:radial-gradient(800px 420px at 50% 20%,rgba(2,132,199,.10),transparent 60%),#f5f8fd',
       'display:flex', 'align-items:center', 'justify-content:center', 'padding:24px'
     ].join(';');
     box.innerHTML =
-      '<div style="width:100%;max-width:360px;text-align:center;font-family:\'Microsoft YaHei\',sans-serif;color:#e8eefc">' +
-        '<div style="font-size:20px;font-weight:800;color:#00e5ff;margin-bottom:6px">快乐8 预测台</div>' +
-        '<div style="font-size:12px;color:#8b96b3;margin-bottom:18px">请输入访问口令</div>' +
+      '<div style="width:100%;max-width:360px;text-align:center;font-family:\'Microsoft YaHei\',sans-serif;color:#1c2434;' +
+        'background:#fff;border-radius:16px;padding:26px 22px;box-shadow:0 8px 26px rgba(23,38,71,.12)">' +
+        '<div style="font-size:20px;font-weight:800;color:#0284c7;margin-bottom:6px">快乐8 预测台</div>' +
+        '<div style="font-size:12px;color:#68738a;margin-bottom:18px">请输入访问口令</div>' +
         '<input id="gatePwd" type="password" autocomplete="off" ' +
-          'style="width:100%;box-sizing:border-box;padding:11px 13px;border-radius:8px;border:1px solid rgba(148,163,204,.3);' +
-          'background:rgba(255,255,255,.05);color:#e8eefc;font-size:14px;outline:none">' +
+          'style="width:100%;box-sizing:border-box;padding:11px 13px;border-radius:8px;border:1px solid rgba(28,36,52,.14);' +
+          'background:#fff;color:#1c2434;font-size:14px;outline:none">' +
         '<button id="gateGo" style="margin-top:12px;width:100%;padding:11px;border:none;border-radius:8px;cursor:pointer;' +
-          'background:linear-gradient(135deg,#00b8d4,#7c4dff);color:#fff;font-size:14px;font-weight:700">进入</button>' +
-        '<div id="gateMsg" style="margin-top:10px;font-size:12px;color:#fb7185;min-height:16px"></div>' +
+          'background:linear-gradient(135deg,#0284c7,#7c3aed);color:#fff;font-size:14px;font-weight:700">进入</button>' +
+        '<div id="gateMsg" style="margin-top:10px;font-size:12px;color:#dc2626;min-height:16px"></div>' +
       '</div>';
     document.body.appendChild(box);
 
