@@ -323,7 +323,8 @@ def algo_order(rows, aid, stat, picks10):
     """
     if aid == "ai":
         base = ranked_numbers(rows)
-    elif aid == CONSENSUS_ID:
+    elif aid in (CONSENSUS_ID, OVERLAP_ID):
+        # 这两个算法本身就是汇总结果，扩展排序时用自身推荐 + 本地评分
         base = list(picks10) + ranked_numbers(rows)
     else:
         base = algo_rank(rows, aid, stat)
@@ -624,9 +625,11 @@ ALGOS = [
     ("prev", "上期规律", "以上一期号码为基准：重号 4 个 + 邻号 3 个 + 同尾号 3 个，跟随最近一期结构"),
     ("random", "随机对照", "以期号为种子的固定随机序列，作为基准线"),
     ("consensus", "重复号码", "统计以上各套算法同一期共同推荐的号码，按被推荐次数（票数）排序"),
+    ("overlap", "高频重合", "统计其余 7 套算法十种玩法全部注里各号码的出现次数，按重合度重新排序"),
 ]
 
 CONSENSUS_ID = "consensus"      # 重复号码算法的 id，需要特殊处理（汇总其他算法）
+OVERLAP_ID = "overlap"          # 高频重合算法的 id，依赖其余算法的"每玩法 10 注"结果
 
 
 def load_json(path, default):
@@ -836,9 +839,61 @@ def consensus_history(st, box):
     return added
 
 
+def overlap_votes(st, issue):
+    """
+    统计某一期"其余算法十种玩法全部注"里各号码出现的次数（重合度）。
+    只用 7 套基础算法，跳过"重复号码/高频重合"这两个汇总算法，避免互相放大。
+    """
+    votes = {}
+    for aid, _name, _desc in ALGOS:
+        if aid in (CONSENSUS_ID, OVERLAP_ID):
+            continue
+        for rec in (st["algos"].get(aid) or {}).get("history", []):
+            if rec.get("target") != issue:
+                continue
+            for n in range(1, 11):
+                for bet in ((rec.get("bets") or {}).get(str(n)) or []):
+                    for v in bet:
+                        votes[v] = votes.get(v, 0) + 1
+            break
+    return votes
+
+
+def overlap_history(st, box):
+    """
+    回填"高频重合"算法往期记录：用其余算法同一期全部注重新计票，
+    使它的中奖率一开始就有与其它算法相同的样本量。
+    """
+    have = {r["target"] for r in box["history"]}
+    issues = set()
+    for aid, _name, _desc in ALGOS:
+        if aid in (CONSENSUS_ID, OVERLAP_ID):
+            continue
+        for rec in (st["algos"].get(aid) or {}).get("history", []):
+            if rec.get("bets"):
+                issues.add(rec["target"])
+    added = False
+    for iss in sorted(issues):
+        if iss in have:
+            continue
+        votes = overlap_votes(st, iss)
+        if not votes:
+            continue
+        order = sorted(votes, key=lambda v: (-votes[v], v))[:10]   # 出现次数多优先，同票按号码升序
+        box["history"].append({
+            "target": iss, "picks10": order, "method": "高频重合",
+            "notes": ["%d票" % votes[v] for v in order],
+            "settled": False, "hit": None, "created": "回填",
+        })
+        added = True
+    if added:
+        box["history"].sort(key=lambda r: r["target"])
+    return added
+
+
 def settle_algos(rows):
     """
-    8 套算法并行：结算各套到期的历史预测（含选一命中与十种玩法命中），
+    9 套算法并行：结算各套到期的历史预测（含选一命中与十种玩法命中），
     并为还没有下一期预测的算法各生成一条。返回每套的当前预测与滚动命中率。
     其中"重复号码"是汇总其余算法的投票结果，故排在最后处理。
     """
@@ -853,6 +908,9 @@ def settle_algos(rows):
         box = st["algos"].setdefault(aid, {"history": []})
         # 重复号码：先用其余算法的往期推荐回填历史记录（随后由第 1 步统一结算）
         if aid == CONSENSUS_ID and consensus_history(st, box):
+            changed = True
+        # 高频重合：用其余算法"每玩法 10 注"的往期记录重新计票回填
+        if aid == OVERLAP_ID and overlap_history(st, box):
             changed = True
         # 第 1 步：结算该套算法已到期的预测
         for rec in box["history"]:
@@ -917,6 +975,16 @@ def settle_algos(rows):
                 order = sorted(votes, key=lambda v: (-votes[v], v))
                 picks10 = order[:10]
                 if len(picks10) < 10:      # 票数不足 10 个时，用本地评分补齐
+                    picks10 += [v for v in ranked_numbers(rows)
+                                if v not in picks10][:10 - len(picks10)]
+                m = name
+                notes = ["%d票" % votes.get(v, 0) for v in picks10]
+            elif aid == OVERLAP_ID:
+                # 高频重合：统计其余算法十种玩法全部注的号码出现次数，按重合度取前 10
+                votes = overlap_votes(st, next_issue)
+                order = sorted(votes, key=lambda v: (-votes[v], v))
+                picks10 = order[:10]
+                if len(picks10) < 10:      # 出现次数不足 10 个时，用本地评分补齐
                     picks10 += [v for v in ranked_numbers(rows)
                                 if v not in picks10][:10 - len(picks10)]
                 m = name
