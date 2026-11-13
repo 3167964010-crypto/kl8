@@ -371,7 +371,7 @@ function renderTabs() {
     var sk = streakInfo(a.history);
     // 主数字：十种玩法各 5 注的合计中奖率；下面小字再附选一口径，避免误读
     var sub = comb ? '十玩法合计 中 ' + comb.win + '/' + comb.cnt + ' 注' : '暂无已开奖期';
-    var sub2 = a.total ? '选一 ' + (a.rate === null ? '—' : a.rate + '%') + ' · 预测 ' + a.total + ' 期 · 命中 ' + (a.hits || 0) + ' 期' : '';
+    var sub2 = a.total ? '预测 ' + a.total + ' 期 · 命中 ' + (a.hits || 0) + ' 期' : '';
     if (a.total && sk.miss > 0) { sub2 += ' · 连续 ' + sk.miss + ' 期未中'; }
     else if (a.total && sk.hit > 0) { sub2 += ' · 连续 ' + sk.hit + ' 期命中'; }
     return '<div class="tab' + (on ? ' on' : '') + '" data-id="' + a.id + '"' + style + '>' +
@@ -553,15 +553,8 @@ function renderAlgo() {
         '</span>' + copyBtnHTML(nums) + '</div>' +
         '<div class="ten-balls">' + (balls || '—') + '</div></div>';
     }
-    // 当期结果：上一期这 10 注实际中了几注（未开奖则显示待开奖）
-    var per = lastRec ? periodStats(list, lastRec.actual, n) : null;
-    // 先明确"这批号码是哪一期"，再单独给上一期结果，避免误把旧结果套在新号码上
-    var foot = '<div class="bet-head">第 ' + cur.target + ' 期预测 · 待开奖</div>' +
-      (per
-        ? '<div class="ten-row"><span>上一期 第 ' + lastRec.target + ' 期结果</span><b>中 ' +
-          per.win + ' / ' + per.cnt + ' 注（' + Math.round(per.win / per.cnt * 100) + '%）</b></div>' +
-          '<div class="tier-line">该期档位：' + tierText(per.tiers) + '</div>'
-        : '<div class="ten-row"><span>暂无已开奖记录</span><b>—</b></div>');
+    // 卡片只保留"这批号码是哪一期"，上期结果统一放到下方开奖对照区，避免重复与误读
+    var foot = '<div class="bet-head">第 ' + cur.target + ' 期预测 · 待开奖</div>';
     return '<div class="ten-card"><div class="ten-title"><span style="color:' + c + ';">选' + cn[n - 1] +
       '</span><span class="ten-count">共 ' + (list ? list.length : 5) + ' 注</span>' + copyBtnHTML(list) + '</div>' +
       '<div class="bet-list">' + betRows(list) + '</div>' + foot + '</div>';

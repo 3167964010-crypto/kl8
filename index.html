@@ -1080,15 +1080,8 @@ function renderPredict(p) {
     '<div class="ai-rate">滚动命中率：' + rateTxt + '</div>' +
     buildTenGrid(cur.picks10 || [], function (n) {
       var b = btMap[n] || {};
-      var lp = (p.last_play && p.last_play.plays) ? p.last_play.plays[String(n)] : null;
-      // 当期口径：只看最近一期这 10 注的实际结果，不做往期累计
-      var perTxt = lp
-        ? '<div class="ten-row"><span>上一期 第 ' + p.last_play.issue + ' 期结果</span><b>中 ' +
-          lp.win + ' / ' + lp.cnt + ' 注（' + (lp.cnt ? Math.round(lp.win / lp.cnt * 100) : 0) + '%）</b></div>' +
-          '<div class="tier-line">该期档位：' + tierText(lp.tiers) + '</div>'
-        : '<div class="ten-row"><span>暂无已开奖记录</span><b>—</b></div>';
-      return perTxt +
-        '<div class="ten-row"><span>单注理论中奖率</span><b>' + (b.theo_rate || 0).toFixed(2) + '%</b></div>';
+      // 卡片不再重复展示上一期结果（统一看算法页的开奖对照），只留理论中奖率
+      return '<div class="ten-row"><span>单注理论中奖率</span><b>' + (b.theo_rate || 0).toFixed(2) + '%</b></div>';
     }, cur.bets, cur.target_issue) +
     '<div class="bt-detail" style="max-height:none">' + histHtml + '</div>';
   bindCopyButtons(el);          // 十种玩法格子与历史预测行上的复制按钮统一绑定
