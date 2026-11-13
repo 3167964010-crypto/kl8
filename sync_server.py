@@ -681,13 +681,13 @@ ALGOS = [
     ("prev", "上期规律", "以上一期号码为基准：重号 4 个 + 邻号 3 个 + 同尾号 3 个，跟随最近一期结构"),
     ("random", "随机对照", "以期号为种子的固定随机序列，作为基准线"),
     ("consensus", "重复号码", "统计以上各套算法同一期共同推荐的号码，按被推荐次数（票数）排序"),
-    ("overlap", "高频重合", "统计前八套算法各自前 10 推荐中被同时选中的号码，按推荐它的算法套数（票数）排序"),
+    ("overlap", "高频重合", "统计前八套算法十种玩法全部注（每玩法 5 注）中号码的出现次数，按出现次数从高到低排序"),
 ]
 
 CONSENSUS_ID = "consensus"      # 重复号码算法的 id，需要特殊处理（汇总其他算法）
-OVERLAP_ID = "overlap"          # 高频重合算法的 id，依赖前八套算法的主推号
+OVERLAP_ID = "overlap"          # 高频重合算法的 id，依赖前八套算法的全部投注号码
 BETS_PER_PLAY = 5               # 每种玩法预测的注数（选一~选十各 5 注）
-CFG_VERSION = "v2-5bets-overlap8"   # 算法配置版本：升级时清空受影响的缓存结果并按新规则重算
+CFG_VERSION = "v3-overlap-allbets"  # 算法配置版本：升级时清空受影响的缓存结果并按新规则重算
 
 
 def bets_need_rebuild(bets):
@@ -906,8 +906,8 @@ def consensus_history(st, box):
 
 def overlap_votes(st, issue):
     """
-    统计某一期"前八套算法各自前 10 推荐"的号码票数：
-    某个号码被几套算法同时推荐，就记几票（最多 8 票）。
+    统计某一期"前八套算法十种玩法全部注（每玩法 5 注）"里每个号码的出现次数：
+    某号码在八套算法共 400 注里出现了几次，就记几票（出现次数越高越靠前）。
     只取算法清单前八套，跳过"高频重合"自身，避免自我放大。
     """
     votes = {}
@@ -917,15 +917,19 @@ def overlap_votes(st, issue):
         for rec in (st["algos"].get(aid) or {}).get("history", []):
             if rec.get("target") != issue:
                 continue
-            for v in (rec.get("picks10") or []):
-                votes[v] = votes.get(v, 0) + 1
+            bets = rec.get("bets") or {}
+            # 选一~选十每个玩法各 5 注，逐注逐号累加出现次数
+            for n in range(1, 11):
+                for bet in (bets.get(str(n)) or []):
+                    for v in bet:
+                        votes[v] = votes.get(v, 0) + 1
             break
     return votes
 
 
 def overlap_history(st, box):
     """
-    回填"高频重合"算法往期记录：用前八套算法同一期的主推号重新计票，
+    回填"高频重合"算法往期记录：用前八套算法同一期的全部投注号码重新计票，
     使它的中奖率一开始就有与其它算法相同的样本量。
     """
     have = {r["target"] for r in box["history"]}
@@ -934,7 +938,8 @@ def overlap_history(st, box):
         if aid == OVERLAP_ID:
             continue
         for rec in (st["algos"].get(aid) or {}).get("history", []):
-            if rec.get("picks10"):
+            # 要求该期已有"每玩法 5 注"的记录，否则无法统计号码出现次数
+            if rec.get("picks10") and rec.get("bets"):
                 issues.add(rec["target"])
     added = False
     for iss in sorted(issues):
@@ -943,10 +948,10 @@ def overlap_history(st, box):
         votes = overlap_votes(st, iss)
         if not votes:
             continue
-        order = sorted(votes, key=lambda v: (-votes[v], v))[:10]   # 出现次数多优先，同票按号码升序
+        order = sorted(votes, key=lambda v: (-votes[v], v))[:10]   # 出现次数多优先，同次数按号码升序
         box["history"].append({
             "target": iss, "picks10": order, "method": "高频重合",
-            "notes": ["%d票" % votes[v] for v in order],
+            "notes": ["%d次" % votes[v] for v in order],
             "settled": False, "hit": None, "created": "回填",
         })
         added = True
@@ -966,7 +971,7 @@ def settle_algos(rows):
     next_issue = str(int(rows[-1]["code"]) + 1)
     st = load_json(ALGO_FILE, {"algos": {}})
     changed = False
-    # 配置升级（每玩法 5 注 / 高频重合改为前八套主推号）：旧的汇总结果作废，按新规则重算
+    # 配置升级（每玩法 5 注 / 高频重合改为统计八套算法的全部投注号码）：旧的汇总结果作废，按新规则重算
     if st.get("cfg_version") != CFG_VERSION:
         st["algos"].pop(OVERLAP_ID, None)
         st["cfg_version"] = CFG_VERSION
@@ -978,7 +983,7 @@ def settle_algos(rows):
         # 重复号码：先用其余算法的往期推荐回填历史记录（随后由第 1 步统一结算）
         if aid == CONSENSUS_ID and consensus_history(st, box):
             changed = True
-        # 高频重合：用其余算法"每玩法 10 注"的往期记录重新计票回填
+        # 高频重合：用其余算法"每玩法 5 注"的往期记录重新计票回填
         if aid == OVERLAP_ID and overlap_history(st, box):
             changed = True
         # 第 1 步：结算该套算法已到期的预测
@@ -1057,7 +1062,7 @@ def settle_algos(rows):
                     picks10 += [v for v in ranked_numbers(rows)
                                 if v not in picks10][:10 - len(picks10)]
                 m = name
-                notes = ["%d票" % votes.get(v, 0) for v in picks10]
+                notes = ["%d次" % votes.get(v, 0) for v in picks10]
             else:
                 stat = algo_stats(rows)
                 picks10 = algo_rank(rows, aid, stat)[:10]
