@@ -178,7 +178,8 @@ def llm_pick10(rows):
             data = json.loads(resp.read().decode("utf-8"))
         text = data["choices"][0]["message"]["content"]
         nums = []
-        for x in re.findall(r"\b([1-7]?\d|80)\b", text):   # 按顺序提取 1-80 的数字
+        # \d{1,2} 才能吃到「07」这类带前导零的号码，避免 01-09 被漏掉
+        for x in re.findall(r"\d{1,2}", text):
             v = int(x)
             if 1 <= v <= 80 and v not in nums:
                 nums.append(v)
@@ -444,15 +445,20 @@ def build_history(rows, count=100):
     return out
 
 
-def settle_and_predict():
+def settle_and_predict(rows=None):
     """
     核心流程（每次调用自动执行）：
     1. 拉取最新开奖
     2. 结算所有到期但未结算的历史预测（滚动命中率依据）
     3. 若还没有针对"下一期"的预测，则生成一条新预测并保存
     返回给前端的完整状态。
+    rows 可外部传入（定时任务里只抓一次，避免重复请求数据源）
     """
-    rows = fetch_rows(101)                            # 多取 1 期作为首期回测的基线
+    if not rows:
+        rows = fetch_rows(101)                        # 多取 1 期作为首期回测的基线
+    if not rows:
+        # 两个数据源都没拿到数据时给出可读的错误，避免下游 rows[-1] 抛 IndexError
+        raise RuntimeError("拉取开奖数据失败：福彩官网与新浪走势图均未返回数据")
     model_rows = rows[-100:]                          # 模型统一只用最近 100 期，与页面标注一致
     drawn = {r["code"]: r["nums"] for r in rows}      # 期号 -> 号码集合
     last = rows[-1]
@@ -966,6 +972,9 @@ def settle_algos(rows):
     并为还没有下一期预测的算法各生成一条。返回每套的当前预测与滚动命中率。
     其中"重复号码"是汇总其余算法的投票结果，故排在最后处理。
     """
+    if not rows:
+        # 数据源全挂时直接报错，避免 rows[-1] 抛 IndexError 让定时任务红屏
+        raise RuntimeError("拉取开奖数据失败：福彩官网与新浪走势图均未返回数据")
     drawn = {r["code"]: r["nums"] for r in rows}
     pos = {r["code"]: i for i, r in enumerate(rows)}   # 期号 → 在 rows 中的位置（取"开奖前"历史用）
     next_issue = str(int(rows[-1]["code"]) + 1)
@@ -1145,6 +1154,8 @@ class Handler(SimpleHTTPRequestHandler):
             self.handle_llm_test()
         elif self.path.startswith("/api/upick"):
             self.handle_upick_save()
+        elif self.path.startswith("/api/ai_learn"):
+            self.handle_ai_learn()
         else:
             self._send_json({"state": -1, "message": "未知接口"}, 404)
 
@@ -1261,6 +1272,61 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json({"state": -1, "message": "HTTP %d %s" % (e.code, hint)}, 200)
         except Exception as exc:
             self._send_json({"state": -1, "message": "连接失败：%s" % exc}, 200)
+
+    def handle_ai_learn(self):
+        """AI 自学习：把各算法近 20 期命中率 + 近 50 期开奖交给大模型，让它给出下一期 10 个号"""
+        conf = load_llm_conf()
+        if not conf:
+            self._send_json({"ok": False,
+                             "message": "尚未配置大模型（llm_config.json 或环境变量 KL8_LLM_URL / KL8_LLM_KEY）"})
+            return
+        body = self._read_body()
+        weights = body.get("weights") or []
+        draws = body.get("draws") or []
+        # 上下文一：各算法近 20 期推荐 10 号的命中率（越高说明该逻辑近期越准）
+        wtxt = "\n".join("%s：%.1f%%" % (str(w.get("name", ""))[:20],
+                                         float(w.get("rate", 0)) * 100)
+                         for w in weights[:30])
+        # 上下文二：最近 50 期开奖号码
+        recent = draws[-50:]
+        dtxt = "\n".join("%s: %s" % (str(d.get("code", "")),
+                                     " ".join("%02d" % int(x) for x in d.get("nums", [])))
+                         for d in recent)
+        prompt = (
+            "你是快乐8（80 选 20）数据分析助手。\n"
+            "下面是 18 套统计算法在最近 20 期的推荐命中率，数值越高说明该逻辑近期越准：\n%s\n\n"
+            "最近 %d 期开奖号码：\n%s\n\n"
+            "请结合这些命中率权重以及号码冷热、遗漏、区间分布，给出下一期最值得关注的 10 个号码"
+            "（01-80、不重复），按推荐度从高到低排序，用逗号分隔。只回答数字，不要解释。"
+            % (wtxt, len(recent), dtxt))
+        payload = json.dumps({
+            "model": conf["model"],
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.2,
+        }).encode("utf-8")
+        req = urllib.request.Request(conf["url"], data=payload, headers={
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + conf["key"],
+        })
+        try:
+            ctx = ssl._create_unverified_context()
+            with urllib.request.urlopen(req, timeout=60, context=ctx) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            text = data["choices"][0]["message"]["content"]
+        except Exception as exc:
+            self._send_json({"ok": False, "message": "调用失败：%s" % exc})
+            return
+        # 只按出现顺序取 1-80 内的数字，去重后取前 10 个
+        # 用 \d{1,2} 而不是带 \b 的写法：否则「07」这类带前导零的号码会被漏掉
+        nums = []
+        for x in re.findall(r"\d{1,2}", text):
+            v = int(x)
+            if 1 <= v <= 80 and v not in nums:
+                nums.append(v)
+        if len(nums) < 10:
+            self._send_json({"ok": False, "message": "模型返回号码不足：%s" % text[:60]})
+            return
+        self._send_json({"ok": True, "nums": nums[:10], "model": conf["model"]})
 
     def _send_json(self, obj, code=200):
         """统一 JSON 响应"""

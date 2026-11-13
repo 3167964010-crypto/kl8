@@ -1,0 +1,852 @@
+<!-- 测试算法页：按《彩票算法总览》里每种逻辑各写一套，独立页面，方便整体撤回 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>测试算法 · 快乐8</title>
+<!-- 访问口令门禁：未通过时先隐藏页面 -->
+<script src="gate.js"></script>
+<style>
+  /* === 主题：与预测台一致的米黄暖灰 === */
+  :root{
+    --bg:#efeae2; --bg2:#faf7f1; --ink:#3a352e; --muted:#8a8175;
+    --rule:rgba(120,104,80,.18); --accent:#9a6a1a; --accent2:#6d5a9c;
+    --font:'Microsoft YaHei','PingFang SC','Noto Sans SC',-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--font);color:var(--ink);line-height:1.7;font-size:15px;
+       padding:22px 16px 52px;min-height:100vh;background:var(--bg);}
+  .page{max-width:900px;margin:0 auto;}
+
+  /* === 顶栏 === */
+  .topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;
+          padding-bottom:14px;border-bottom:1px solid var(--rule);}
+  .title{font-size:24px;font-weight:800;}
+  .title small{display:block;font-size:11px;letter-spacing:.2em;color:var(--accent);font-weight:700;margin-bottom:2px;}
+  .navlink{display:inline-block;font-size:12px;color:var(--accent);font-weight:700;text-decoration:none;
+           border:1px solid rgba(154,106,26,.35);border-radius:8px;padding:5px 11px;background:#faf7f1;}
+  .navlink:hover{background:rgba(154,106,26,.10);}
+  .statusbar{font-size:12.5px;color:var(--muted);padding:12px 0;}
+  .statusbar b{color:var(--ink);font-variant-numeric:tabular-nums;}
+
+  /* === 卡片 === */
+  .card{background:var(--bg2);border:1px solid var(--rule);border-radius:14px;padding:16px 18px;margin-top:14px;
+        box-shadow:0 2px 10px rgba(120,104,80,.06);}
+  .card h3{font-size:14px;font-weight:700;margin-bottom:10px;padding-left:9px;border-left:3px solid var(--accent);}
+
+  /* === 算法 Tab === */
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+  .tab{border:1px solid var(--rule);border-radius:10px;padding:8px 12px;cursor:pointer;background:var(--bg2);
+       color:var(--muted);font-size:12.5px;font-weight:700;text-align:left;transition:all .15s;min-width:150px;}
+  .tab small{display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;}
+  .tab .trate{font-size:16px;font-weight:800;color:var(--accent);font-variant-numeric:tabular-nums;}
+  .tab.on{border-color:var(--accent);background:rgba(154,106,26,.08);color:var(--ink);box-shadow:0 2px 10px rgba(154,106,26,.14);}
+  .tab:hover{border-color:rgba(154,106,26,.40);}
+
+  /* === 号码球 === */
+  .balls{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0;}
+  .ball{width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+        font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums;background:#f0e9dc;color:#5f584d;}
+  .ball.pred{background:linear-gradient(135deg,#ffd166,#ff9f43);color:#1a0f00;}   /* 预测号码：橙色 */
+  .ball.hit{background:linear-gradient(135deg,#c08a2e,#8a5a12);color:#fff;font-weight:800;
+            box-shadow:0 0 0 2px rgba(154,106,26,.45);}                              /* 命中：深金实心，明显区分 */
+  .ball.sm{width:25px;height:25px;font-size:11px;}
+
+  /* === 详情头 === */
+  .algo-name{font-size:17px;font-weight:800;}
+  .algo-src{font-size:11.5px;color:var(--muted);font-family:Consolas,monospace;}
+  .algo-logic{font-size:12.5px;color:#6b6357;margin-top:6px;}
+  .rate-line{font-size:13px;margin-top:10px;}
+  .rate-line b{color:var(--accent);font-size:16px;}
+
+  /* === 十玩法单注列表 === */
+  .play-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 0;border-top:1px dashed var(--rule);}
+  .play-row:first-child{border-top:none;}
+  .play-name{font-size:12px;font-weight:700;color:var(--muted);min-width:40px;}
+  .play-rate{margin-left:auto;font-size:11.5px;color:var(--muted);white-space:nowrap;}
+  .play-rate b{color:var(--accent);}
+
+  /* === 自学习权重表：两列展示各算法命中率 === */
+  .wgrid{display:grid;grid-template-columns:1fr 1fr;gap:2px 16px;}
+  .wrow{display:flex;align-items:center;gap:8px;font-size:12px;padding:3px 0;border-bottom:1px dashed var(--rule);}
+  .wname{color:#6b6357;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .wrate{margin-left:auto;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums;}
+
+  /* === AI 自学习状态条：接入成功绿色，未接入琥珀色 === */
+  .ai-state{margin-top:10px;font-size:12.5px;border-radius:8px;padding:7px 11px;border:1px solid;line-height:1.6;}
+  .ai-state.ok{color:#2f6b3a;background:rgba(70,150,90,.10);border-color:rgba(70,150,90,.35);}
+  .ai-state.warn{color:#8a5a12;background:rgba(192,138,46,.10);border-color:rgba(192,138,46,.35);}
+
+  /* === 回测表 === */
+  .table-wrap{overflow-x:auto;border:1px solid var(--rule);border-radius:10px;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:900px;background:#fffdf9;}
+  th{background:#f4eee4;text-align:left;padding:8px 10px;border-bottom:1px solid var(--rule);white-space:nowrap;font-size:11.5px;}
+  td{padding:7px 10px;border-bottom:1px solid var(--rule);vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  .n{font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .win{color:#8a5a12;font-weight:700;}
+  .lose{color:#9a9388;}
+  /* 中奖明细列：每行一个玩法档位，避免撑得太宽 */
+  .detail-cell{font-size:11.5px;line-height:1.55;white-space:nowrap;}
+  .mini{display:inline-flex;width:24px;height:24px;border-radius:50%;align-items:center;justify-content:center;
+        font-size:10.5px;font-weight:700;background:#f2ece2;color:#a8a094;margin:1.5px;font-variant-numeric:tabular-nums;}
+  /* 命中：深金实心 + 白字 + 描边，未命中为淡灰，一眼可辨 */
+  .mini.hit{background:linear-gradient(135deg,#c08a2e,#8a5a12);color:#fff;font-weight:800;
+            box-shadow:0 0 0 2px rgba(154,106,26,.45);}
+  .mini.pred{background:rgba(255,159,67,.22);color:#8a4b00;}
+
+  /* === 底部说明 === */
+  .legend{font-size:11.5px;color:var(--muted);margin-top:10px;line-height:1.7;}
+  .note{margin-top:22px;border:1px dashed rgba(109,90,156,.35);border-radius:12px;background:rgba(109,90,156,.05);
+        padding:14px 16px;font-size:12.5px;color:#5f574c;}
+  .note h4{font-size:13px;color:var(--accent2);margin-bottom:6px;}
+  @media (max-width:640px){
+    .tab{min-width:calc(50% - 4px);}
+    .ball{width:28px;height:28px;font-size:11.5px;}
+    .page{padding:0;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="topbar">
+    <div class="title"><small>TEST ALGORITHMS</small>测试算法 · 每逻辑一套</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <a class="navlink" href="index.html">← 预测台</a>
+      <a class="navlink" href="algos.html">算法对比</a>
+      <a class="navlink" href="prize.html">奖金统计</a>
+    </div>
+  </div>
+
+  <div class="statusbar" id="status">正在加载开奖数据…</div>
+
+  <!-- 算法切换：每个逻辑一套，主数字为近 20 期十玩法合计中奖率 -->
+  <div class="tabs" id="tabs"></div>
+
+  <!-- 详情：说明 + 下一期一注预测 + 十玩法命中率 + 往期回测 -->
+  <div class="card" id="detail" style="display:none"></div>
+
+  <div class="note">
+    <h4>关于本页</h4>
+    本页把《彩票算法总览》里每种逻辑各实现一套（共 18 套），<b>每种玩法只出 1 注</b>，与正式页的 5 注错开口径独立；
+    另外加了一套「自学习」元算法：按其它 18 套近 20 期的命中率自动分配权重、加权投票出号。
+    全部计算在浏览器本地完成，不改动现有算法数据；<b>整体撤回只需删除本文件</b>。
+    “足球盘口规则”适用于竞猜型彩票，数字彩无对应逻辑，未实现；“概率 / 玄学分析”原项目为文档型无模型，用随机对照代替。
+  </div>
+</div>
+
+<script>
+/* ===================== 基础工具 ===================== */
+
+var ROWS = [];          // 开奖记录（按期号升序）：[{code,date,nums:[20 个号码升序]}]
+var BACK = 50;          // 回测期数（近 50 期逐期预测并结算）
+var MINHIST = 20;       // 每期预测至少需要的历史期数
+var LEARN_W = 20;       // 自学习算法回看的期数（用这段时间各算法的命中率定权重）
+var RESULTS = {};       // 各算法回测结果缓存
+var cur = null;         // 当前选中的算法 id（AI 结果返回后用于刷新）
+
+/* 官方奖金表（每注 2 元）：选 n 中 k 个的奖金，未列出的 k 即未中奖 */
+var PRIZE = {
+  1: {1: 4.6},
+  2: {2: 19},
+  3: {3: 53, 2: 3},
+  4: {4: 100, 3: 5, 2: 3},
+  5: {5: 1000, 4: 21, 3: 3},
+  6: {6: 3000, 5: 30, 4: 10, 3: 3},
+  7: {7: 10000, 6: 288, 5: 28, 4: 4, 0: 2},
+  8: {8: 50000, 7: 800, 6: 88, 5: 10, 4: 3, 0: 2},
+  9: {9: 300000, 8: 2000, 7: 200, 6: 20, 5: 5, 4: 3, 0: 2},
+  10: {10: 5000000, 9: 8000, 8: 800, 7: 80, 6: 5, 5: 3, 0: 2}
+};
+
+/* 统计每个号码出现次数：返回长度 81 的数组（下标 1~80） */
+function freq(rows) {
+  var c = new Array(81).fill(0);
+  for (var i = 0; i < rows.length; i++) {
+    var ns = rows[i].nums;
+    for (var j = 0; j < ns.length; j++) c[ns[j]]++;
+  }
+  return c;
+}
+
+/* 当前遗漏：每个号码距今连续多少期没出现 */
+function miss(rows) {
+  var m = new Array(81).fill(rows.length);
+  for (var k = 1; k <= 80; k++) {
+    for (var i = rows.length - 1; i >= 0; i--) {
+      if (rows[i].nums.indexOf(k) >= 0) { m[k] = rows.length - 1 - i; break; }
+    }
+  }
+  return m;
+}
+
+/* 归一化到 0~1，便于不同量纲的分数相加 */
+function norm(a) {
+  var mx = 0;
+  for (var i = 1; i < a.length; i++) if (a[i] > mx) mx = a[i];
+  if (!mx) return a.map(function () { return 0; });
+  return a.map(function (v) { return v / mx; });
+}
+
+/* 按分值取前 n 个号码；同分按号码升序，保证结果可复现（函数名不能叫 top，会和浏览器内置 window.top 冲突） */
+function topN(score, n) {
+  var arr = [];
+  for (var k = 1; k <= 80; k++) arr.push({ k: k, s: score[k] || 0 });
+  arr.sort(function (a, b) { return b.s - a.s || a.k - b.k; });
+  return arr.slice(0, n).map(function (o) { return o.k; });
+}
+
+/* 最近 k 期出现次数 */
+function recentCount(rows, k) {
+  return freq(rows.slice(-k));
+}
+
+/* 稳定伪随机（xorshift）：同一期号每次刷新得到同一组号码 */
+function rnd(seed) {
+  var x = (seed || 1) >>> 0;
+  return function () {
+    x ^= x << 13; x >>>= 0;
+    x ^= x >>> 17;
+    x ^= x << 5; x >>>= 0;
+    return x / 4294967296;
+  };
+}
+
+/* ===================== 18 套算法：每种逻辑一套 =====================
+   每个 rank(rows) 用「目标期之前的历史」计算，返回按推荐度排序的 10 个号码；
+   每个玩法的 1 注 = 前 n 个号码。 */
+
+var ALGOS = [
+  {
+    id: 'crf', name: 'LSTM + CRF 序列转移', src: 'zepen/predict_Lottery_ticket',
+    logic: '红球用 LSTM+CRF 建模整条号码序列；此处用「上一期号码 → 下一期号码」的共现转移频次打分。',
+    rank: function (rows) {
+      var last = rows[rows.length - 1].nums;
+      var trans = new Array(81).fill(0);
+      for (var i = 1; i < rows.length; i++) {
+        var prev = rows[i - 1].nums, cur = rows[i].nums;
+        for (var a = 0; a < prev.length; a++) {
+          if (last.indexOf(prev[a]) < 0) continue;      // 只看与上期号码相关的转移
+          for (var b = 0; b < cur.length; b++) trans[cur[b]]++;
+        }
+      }
+      var cn = norm(freq(rows)), tn = norm(trans), s = new Array(81).fill(0);
+      for (var k = 1; k <= 80; k++) s[k] = tn[k] * 0.75 + cn[k] * 0.25;
+      return topN(s, 10);
+    }
+  },
+  {
+    id: 'pos', name: '多位 LSTM 分类', src: 'KittenCN/predict_Lottery_ticket',
+    logic: '每个开奖位单独做分类（TimeDistributed + LSTM）；此处按第 1~20 位的位次分布统计近 20 期频率。',
+    rank: function (rows) {
+      var recent = rows.slice(-20), s = new Array(81).fill(0);
+      for (var i = 0; i < 20; i++) {
+        var cnt = new Array(81).fill(0);
+        for (var r = 0; r < recent.length; r++) cnt[recent[r].nums[i]]++;
+        var n = norm(cnt);
+        for (var k = 1; k <= 80; k++) s[k] += n[k];
+      }
+      var g = norm(freq(rows));
+      for (var k2 = 1; k2 <= 80; k2++) s[k2] += g[k2] * 0.3;
+      return topN(s, 10);
+    }
+  },
+  {
+    id: 'attn', name: 'Transformer 注意力', src: 'KittenCN/predict_Lottery_ticket_pytorch',
+    logic: 'TransformerEncoder / BiLSTM + 多头注意力，本质是给近期样本更大权重；此处用 0.94 的指数衰减加权。',
+    rank: function (rows) {
+      var s = new Array(81).fill(0);
+      for (var age = 0; age < rows.length; age++) {
+        var w = Math.pow(0.94, age);                    // 越近权重越大
+        var ns = rows[rows.length - 1 - age].nums;
+        for (var j = 0; j < ns.length; j++) s[ns[j]] += w;
+      }
+      return topN(s, 10);
+    }
+  },
+  {
+    id: 'self', name: 'Keras 自监督重建', src: 'CorvusCodex/LotteryAi',
+    logic: '模型训练标签就是输入行（fit(x,x)），输出其实是输入的重排；此处把上期 20 个号码按历史频率重排后取前 10。',
+    rank: function (rows) {
+      var last = rows[rows.length - 1].nums.slice();
+      var c = freq(rows.slice(0, -1));                  // 用历史频率给上期号码重新排序
+      last.sort(function (a, b) { return (c[b] - c[a]) || (a - b); });
+      return last.slice(0, 10);
+    }
+  },
+  {
+    id: 'power', name: '强力球分组重排', src: 'CorvusCodex/PowerballAi',
+    logic: '白球与特别号分开建模再合并；此处把上期号码拆成 1~40 / 41~80 两组，各自按近 30 期频率排序后交替取号。',
+    rank: function (rows) {
+      var last = rows[rows.length - 1].nums, c = freq(rows.slice(-30));
+      var low = last.filter(function (v) { return v <= 40; })
+                    .sort(function (a, b) { return (c[b] - c[a]) || (a - b); });
+      var high = last.filter(function (v) { return v > 40; })
+                     .sort(function (a, b) { return (c[b] - c[a]) || (a - b); });
+      var out = [];
+      while (out.length < 10 && (low.length || high.length)) {
+        if (low.length) out.push(low.shift());
+        if (high.length && out.length < 10) out.push(high.shift());
+      }
+      return out;
+    }
+  },
+  {
+    id: 'ngram', name: '字符级语言模型', src: 'chengstone/LotteryPredict',
+    logic: '把每期号码当文本序列，用 2 层 LSTM 预测下一位；此处统计「号码 x 后面出现 y」的二元转移频次。',
+    rank: function (rows) {
+      var tr = {};
+      for (var i = 0; i < rows.length; i++) {
+        var ns = rows[i].nums;
+        for (var j = 0; j < ns.length - 1; j++) {
+          var a = ns[j], b = ns[j + 1];
+          (tr[a] = tr[a] || {})[b] = (tr[a][b] || 0) + 1;
+        }
+      }
+      var last = rows[rows.length - 1].nums, s = new Array(81).fill(0);
+      for (var x = 0; x < last.length; x++) {
+        var row = tr[last[x]];
+        if (!row) continue;
+        for (var y in row) s[+y] += row[y];
+      }
+      var tn = norm(s), g = norm(freq(rows));
+      for (var k = 1; k <= 80; k++) s[k] = tn[k] * 0.7 + g[k] * 0.3;
+      return topN(s, 10);
+    }
+  },
+  {
+    id: 'trend', name: '双向 LSTM 滚动回归', src: 'Ahmad-Alam/Lottery-Prediction',
+    logic: '4 层 BiLSTM 对归一化滚动窗口做多步回归；此处对每号近 12 期「出现/未出现」序列做最小二乘斜率外推。',
+    rank: function (rows) {
+      var win = rows.slice(-12), s = new Array(81).fill(0);
+      for (var k = 1; k <= 80; k++) {
+        var sx = 0, sy = 0, sxy = 0, sxx = 0;
+        for (var i = 0; i < win.length; i++) {
+          var y = win[i].nums.indexOf(k) >= 0 ? 1 : 0;
+          sx += i; sy += y; sxy += i * y; sxx += i * i;
+        }
+        var n = win.length, den = n * sxx - sx * sx;
+        var slope = den ? (n * sxy - sx * sy) / den : 0;
+        s[k] = slope * 10 + sy / n;                     // 趋势为主，近期热度为辅
+      }
+      return topN(s, 10);
+    }
+  },
+  {
+    id: 'meanrev', name: '全号码 MSE 回归', src: 'jindeok/Lottery_Prediction',
+    logic: '一层 LSTM 接 Dense(80) 用 MSE 回归下一期号码向量；此处用「长期频率 − 近 10 期频率」衡量冷号回归空间。',
+    rank: function (rows) {
+      var all = freq(rows), rec = recentCount(rows, 10), s = new Array(81).fill(0);
+      for (var k = 1; k <= 80; k++) {
+        s[k] = all[k] / rows.length - rec[k] / 10;      // 近期偏冷的号码得分更高
+      }
+      return topN(s, 10);
+    }
+  },
+  {
+    id: 'ses', name: '多时序模型（指数平滑）', src: 'yangboz/LotteryPrediction',
+    logic: '同一份数据跑 LSTM / Prophet / ARIMA / Holt-Winters 做对照；此处取最稳的简单指数平滑（α=0.3）预测每号出现概率。',
+    rank: function (rows) {
+      var a = 0.3, s = new Array(81).fill(0);
+      for (var k = 1; k <= 80; k++) {
+        var p = 0;
+        for (var i = 0; i < rows.length; i++) {
+          var y = rows[i].nums.indexOf(k) >= 0 ? 1 : 0;
+          p = a * y + (1 - a) * p;
+        }
+        s[k] = p;
+      }
+      return topN(s, 10);
+    }
+  },
+  {
+    id: 'ga', name: '遗传算法选号', src: 'gnh1201/lotto_genetic_algorithm',
+    logic: '用遗传算法对号码组合做进化搜索，适应度为近 6 期命中总数；种群 30、迭代 25 代，取最优组合。',
+    rank: function (rows) {
+      var R = rnd(20261113);
+      var fitRows = rows.slice(-6);
+      function fit(combo) {                             // 适应度：组合在近 6 期中的总命中个数
+        var t = 0;
+        for (var i = 0; i < fitRows.length; i++) {
+          var ns = fitRows[i].nums;
+          for (var j = 0; j < combo.length; j++) if (ns.indexOf(combo[j]) >= 0) t++;
+        }
+        return t;
+      }
+      function randomCombo() {
+        var set = {}, out = [];
+        while (out.length < 10) {
+          var v = 1 + Math.floor(R() * 80);
+          if (!set[v]) { set[v] = 1; out.push(v); }
+        }
+        return out;
+      }
+      var pop = [];
+      for (var i = 0; i < 30; i++) pop.push(randomCombo());   // 初始种群
+      for (var g = 0; g < 25; g++) {
+        pop.sort(function (a, b) { return fit(b) - fit(a); });
+        var keep = pop.slice(0, 8);                     // 精英保留
+        while (pop.length < 30) {
+          var p1 = keep[Math.floor(R() * keep.length)];
+          var p2 = keep[Math.floor(R() * keep.length)];
+          var mix = {}, child = [];
+          for (var j = 0; j < 10; j++) mix[R() < 0.5 ? p1[j] : p2[j]] = 1;   // 交叉
+          for (var v = 1; v <= 80 && child.length < 10; v++) if (mix[v]) child.push(v);
+          while (child.length < 10) {                   // 补齐到 10 个不同号码
+            var nv = 1 + Math.floor(R() * 80);
+            if (child.indexOf(nv) < 0) child.push(nv);
+          }
+          if (R() < 0.35) child[Math.floor(R() * 10)] = 1 + Math.floor(R() * 80);  // 变异
+          pop.push(child);
+        }
+      }
+      pop.sort(function (a, b) { return fit(b) - fit(a); });
+      return pop[0].slice().sort(function (a, b) { return a - b; });
+    }
+  },
+  {
+    id: 'bayes', name: '特征工程 + 朴素贝叶斯', src: 'JeffMv/Lofea',
+    logic: '把开奖转成趋势 / 间隔特征后用朴素贝叶斯、随机森林等分类；这里用「历史频率 + 遗漏 + 近 5 期热度」的加权特征分。',
+    rank: function (rows) {
+      var cn = norm(freq(rows)), mn = norm(miss(rows)), rn = norm(recentCount(rows, 5));
+      var s = new Array(81).fill(0);
+      for (var k = 1; k <= 80; k++) s[k] = cn[k] * 0.45 + mn[k] * 0.25 + rn[k] * 0.30;
+      return topN(s, 10);
+    }
+  },
+  {
+    id: 'ens', name: '集成树回归', src: 'Ishanoshada/Lottery-Predict',
+    logic: '随机森林 / GradientBoosting / ExtraTrees 回归后按时间序列交叉验证选最优；此处用频率、遗漏、近 10 期三模型等权平均。',
+    rank: function (rows) {
+      var cn = norm(freq(rows)), mn = norm(miss(rows)), rn = norm(recentCount(rows, 10));
+      var s = new Array(81).fill(0);
+      for (var k = 1; k <= 80; k++) s[k] = (cn[k] + mn[k] + rn[k]) / 3;
+      return topN(s, 10);
+    }
+  },
+  {
+    id: 'path', name: '路径坐标匹配', src: 'liangguifeng/lottery-analyzer',
+    logic: '把历史开奖排成坐标路径，用「相同走势形状」匹配预测；此处用分区出号数 + 奇偶比 + 大小比找最相似的 5 期，取其下一期号码。',
+    rank: function (rows) {
+      function sig(r) {                                 // 走势特征向量
+        var z = [0, 0, 0, 0], odd = 0, big = 0;
+        for (var i = 0; i < r.nums.length; i++) {
+          var v = r.nums[i];
+          z[Math.floor((v - 1) / 20)]++;
+          if (v % 2) odd++;
+          if (v > 40) big++;
+        }
+        return [z[0], z[1], z[2], z[3], odd, big];
+      }
+      var ls = sig(rows[rows.length - 1]), cand = [];
+      for (var i = 0; i < rows.length - 1; i++) {        // 只取后面还有一期的历史期
+        var s2 = sig(rows[i]), d = 0;
+        for (var j = 0; j < ls.length; j++) d += Math.abs(s2[j] - ls[j]);
+        cand.push({ i: i, d: d });
+      }
+      cand.sort(function (a, b) { return a.d - b.d; });
+      var s = new Array(81).fill(0);
+      cand.slice(0, 5).forEach(function (o) {            // 最相似的 5 期，取它们下一期的号码
+        rows[o.i + 1].nums.forEach(function (v) { s[v] += 1; });
+      });
+      return topN(s, 10);
+    }
+  },
+  {
+    id: 'rnd', name: '随机对照（公平基准）', src: 'ma-pony/ssq-predictor · lotterycn/random',
+    logic: '原项目为文档型无预测模型；这里用固定种子的公平随机作为基准，用来对照其它算法是否真的优于随机。',
+    rank: function (rows) {
+      var R = rnd(parseInt(rows[rows.length - 1].code, 10) || 1);
+      var set = {}, out = [];
+      while (out.length < 10) {
+        var v = 1 + Math.floor(R() * 80);
+        if (!set[v]) { set[v] = 1; out.push(v); }
+      }
+      return out.sort(function (a, b) { return a - b; });
+    }
+  },
+  {
+    id: 'comb', name: '频率 + 遗漏 + 重号邻号', src: 'UlionTse/lotterycn',
+    logic: 'lotterycn 的 frequency / omission / repeat 三个预测器组合；上期号码本身及相邻号码额外加分。',
+    rank: function (rows) {
+      var cn = norm(freq(rows)), mn = norm(miss(rows));
+      var last = rows[rows.length - 1].nums, rp = new Array(81).fill(0);
+      for (var i = 0; i < last.length; i++) {
+        var v = last[i];
+        rp[v] += 1;
+        if (v > 1) rp[v - 1] += 0.5;                    // 邻号
+        if (v < 80) rp[v + 1] += 0.5;
+      }
+      var rn = norm(rp), s = new Array(81).fill(0);
+      for (var k = 1; k <= 80; k++) s[k] = cn[k] * 0.45 + mn[k] * 0.30 + rn[k] * 0.25;
+      return topN(s, 10);
+    }
+  },
+  {
+    id: 'mk1', name: '一阶马尔可夫', src: 'UlionTse/lotterycn · markov',
+    logic: '把每个号码的「出现 / 未出现」当两状态马尔可夫链，用历史转移概率预测下一期状态。',
+    rank: function (rows) {
+      var s = new Array(81).fill(0);
+      for (var k = 1; k <= 80; k++) {
+        var a = 0, b = 0, c = 0, d = 0;
+        for (var i = 1; i < rows.length; i++) {
+          var p = rows[i - 1].nums.indexOf(k) >= 0 ? 1 : 0;
+          var q = rows[i].nums.indexOf(k) >= 0 ? 1 : 0;
+          if (p && q) a++; else if (p && !q) b++; else if (!p && q) c++; else d++;
+        }
+        var ps = rows[rows.length - 1].nums.indexOf(k) >= 0 ? 1 : 0;
+        s[k] = ps ? (a + b ? a / (a + b) : 0) : (c + d ? c / (c + d) : 0);
+      }
+      return topN(s, 10);
+    }
+  },
+  {
+    id: 'mk2', name: '二阶马尔可夫', src: 'UlionTse/lotterycn · markov2',
+    logic: '状态取决于前两期，用二阶转移（00 / 01 / 10 / 11）统计下一期出现的概率。',
+    rank: function (rows) {
+      var s = new Array(81).fill(0);
+      for (var k = 1; k <= 80; k++) {
+        var cnt = {}, hit = {};
+        for (var i = 2; i < rows.length; i++) {
+          var p0 = rows[i - 2].nums.indexOf(k) >= 0 ? 1 : 0;
+          var p1 = rows[i - 1].nums.indexOf(k) >= 0 ? 1 : 0;
+          var q = rows[i].nums.indexOf(k) >= 0 ? 1 : 0;
+          var key = '' + p0 + p1;
+          cnt[key] = (cnt[key] || 0) + 1;
+          if (q) hit[key] = (hit[key] || 0) + 1;
+        }
+        var l0 = rows[rows.length - 2].nums.indexOf(k) >= 0 ? 1 : 0;
+        var l1 = rows[rows.length - 1].nums.indexOf(k) >= 0 ? 1 : 0;
+        var key2 = '' + l0 + l1;
+        s[k] = cnt[key2] ? (hit[key2] || 0) / cnt[key2] : 0;
+      }
+      return topN(s, 10);
+    }
+  },
+  {
+    id: 'tail', name: '尾数趋势', src: 'UlionTse/lotterycn · tail / trend',
+    logic: '按尾数（0~9）统计近 6 期热度，再叠加号码自身历史频率，选出热门尾数里更活跃的号码。',
+    rank: function (rows) {
+      var tc = new Array(10).fill(0);
+      rows.slice(-6).forEach(function (r) {
+        r.nums.forEach(function (v) { tc[v % 10]++; });
+      });
+      var tn = norm(tc), g = norm(freq(rows)), s = new Array(81).fill(0);
+      for (var k = 1; k <= 80; k++) s[k] = tn[k % 10] * 0.6 + g[k] * 0.4;
+      return topN(s, 10);
+    }
+  },
+  {
+    /* 自学习：不改动上面 18 套的固定逻辑，而是每期动态给它们分配权重 */
+    id: 'learn', name: '自学习（按命中率加权）', learn: true, src: '本页新增 · 元算法',
+    logic: '每期预测前先回看近 ' + LEARN_W + ' 期，统计其它 18 套算法推荐 10 号的实际命中个数，' +
+           '命中率越高权重越大（权重 = 命中率²），再用它们最新一期的推荐按权重投票，票数最高的 10 个号作为本期推荐。',
+    rank: function (rows) { return topN(freq(rows), 10); }   // 兜底实现，实际走 learnPicks()
+  },
+  {
+    /* AI 自学习：同一套权重口径，但下一期选号交给大模型（需本地服务配置 API Key） */
+    id: 'ailearn', name: 'AI 自学习（大模型）', learn: true, ai: true,
+    src: '本页新增 · 元算法 + 大模型',
+    logic: '把其它 18 套算法近 20 期的命中率、最近 50 期开奖一起交给大模型，由模型结合命中率权重与冷热、遗漏、分区给出下一期 10 个号。' +
+           '回测列是同一权重口径的本地选号结果（AI 只参与下一期出号，避免逐期调用）。',
+    rank: function (rows) { return topN(freq(rows), 10); }
+  }
+];
+
+/* ===================== 回测与结算 ===================== */
+
+/* 基础算法（不含自学习）；BASE[i][算法id] = 只用前 i 期数据算出的 10 号推荐 */
+var BASE_ALGOS = ALGOS.filter(function (a) { return !a.learn; });
+var BASE = {};
+
+/* 预计算各目标期的推荐：自学习要反复读取历史各算法推荐，先算好避免重复计算 */
+function buildBase() {
+  for (var i = MINHIST; i < ROWS.length; i++) {
+    var hist = ROWS.slice(0, i), m = {};
+    for (var x = 0; x < BASE_ALGOS.length; x++) m[BASE_ALGOS[x].id] = BASE_ALGOS[x].rank(hist);
+    BASE[i] = m;
+  }
+}
+
+/* 自学习权重：近 LEARN_W 期中，各基础算法推荐 10 号的平均命中率（0~1） */
+function learnWeights(i) {
+  var out = [], from = Math.max(MINHIST, i - LEARN_W);
+  for (var x = 0; x < BASE_ALGOS.length; x++) {
+    var a = BASE_ALGOS[x], hits = 0, cnt = 0;
+    for (var j = from; j < i; j++) {
+      var pk = BASE[j] && BASE[j][a.id];
+      if (!pk) continue;
+      cnt++;
+      for (var t = 0; t < pk.length; t++) if (ROWS[j].nums.indexOf(pk[t]) >= 0) hits++;
+    }
+    out.push({ id: a.id, name: a.name, rate: cnt ? hits / (cnt * 10) : 0, cnt: cnt });
+  }
+  return out;
+}
+
+/* 自学习选号：各算法最新一期推荐按「命中率²」加权投票，取票数最高的 10 个号 */
+function learnPicks(i) {
+  var ws = learnWeights(i);
+  var lastIdx = i >= ROWS.length ? ROWS.length - 1 : i - 1;   // 用最近一期可用的推荐
+  var cand = BASE[lastIdx];
+  if (!cand) return topN(freq(ROWS.slice(0, i)), 10);         // 历史不足时退回频率
+  var s = new Array(81).fill(0), sumW = 0;
+  ws.forEach(function (w) {
+    var wt = Math.pow(w.rate, 2);                             // 平方放大强弱差距
+    sumW += wt;
+    (cand[w.id] || []).forEach(function (k) { s[k] += wt; });
+  });
+  var g = norm(freq(ROWS.slice(0, i)));
+  for (var k = 1; k <= 80; k++) s[k] += g[k] * 0.002 * (sumW || 1);   // 轻微频率兜底，避免票数并列
+  return topN(s, 10);
+}
+
+/* 取某套算法在第 i 期的推荐（历史 = 前 i 期；i 等于总期数时即“下一期”） */
+function picksFor(a, i) {
+  if (a.learn) return learnPicks(i);
+  if (i >= ROWS.length) return a.rank(ROWS);
+  return BASE[i][a.id];
+}
+
+/* 对某套算法做近 BACK 期回测：每期用之前的历史预测，每玩法只买 1 注 */
+function backtest(a) {
+  var stat = { plays: {}, win: 0, total: 0, rows: [] };
+  for (var n = 1; n <= 10; n++) stat.plays[n] = { win: 0, total: 0, amt: 0 };
+  var start = Math.max(MINHIST, ROWS.length - BACK);   // 至少留 MINHIST 期历史再开始回测
+  for (var i = start; i < ROWS.length; i++) {
+    var target = ROWS[i];
+    var rank = picksFor(a, i);
+    var drawn = target.nums, bets = {}, winCnt = 0, amt = 0;
+    for (var n2 = 1; n2 <= 10; n2++) {
+      var bet = rank.slice(0, n2);
+      var k = bet.filter(function (v) { return drawn.indexOf(v) >= 0; }).length;
+      var p = (PRIZE[n2][k] || 0);
+      bets[n2] = { bet: bet, k: k, amt: p };
+      stat.plays[n2].total++;
+      if (p > 0) { stat.plays[n2].win++; stat.plays[n2].amt += p; winCnt++; amt += p; }
+    }
+    stat.total += 10;
+    stat.win += winCnt;
+    stat.rows.push({ code: target.code, date: target.date, rank: rank, drawn: drawn,
+                     bets: bets, winCnt: winCnt, amt: amt });
+  }
+  stat.next = picksFor(a, ROWS.length);                // 下一期的一注预测
+  return stat;
+}
+
+/* ===================== 渲染 ===================== */
+
+function pad(v) { return v < 10 ? '0' + v : '' + v; }
+function money(v) { return Math.round(v * 100) / 100; }
+var CN = ['一','二','三','四','五','六','七','八','九','十'];   // 玩法序号中文，避免多处重复写数组
+
+/* 生成号码球 HTML；hitSet 里的号码加深 */
+function ballsHTML(list, hitSet, cls) {
+  return '<div class="balls">' + list.map(function (v) {
+    var hit = hitSet && hitSet[v];
+    return '<span class="ball ' + (cls || '') + (hit ? ' hit' : '') + '">' + pad(v) + '</span>';
+  }).join('') + '</div>';
+}
+
+/* Tab：算法名 + 十玩法合计中奖率 */
+function renderTabs(curId) {
+  var box = document.getElementById('tabs');
+  box.innerHTML = ALGOS.filter(function (a) {
+    /* 大模型没接入时隐藏「AI 自学习」：否则它和本地自学习结果完全一致，容易误以为算法重复 */
+    return !(a.ai && !AI_STATE.ok);
+  }).map(function (a) {
+    var st = RESULTS[a.id];
+    var rate = st ? (st.win / st.total * 100) : 0;
+    return '<div class="tab' + (a.id === curId ? ' on' : '') + '" data-id="' + a.id + '">' +
+      a.name + '<small>十玩法合计 <span class="trate">' + rate.toFixed(1) + '%</span></small>' +
+      '<small>中 ' + (st ? st.win : 0) + '/' + (st ? st.total : 0) + ' 注</small></div>';
+  }).join('');
+  Array.prototype.forEach.call(box.querySelectorAll('.tab'), function (el) {
+    el.addEventListener('click', function () { show(el.getAttribute('data-id')); });
+  });
+}
+
+/* 详情：说明 + 下一期预测 + 十玩法命中率 + 往期回测 */
+function renderDetail(id) {
+  var a = ALGOS.filter(function (x) { return x.id === id; })[0];
+  var st = RESULTS[id];
+  var box = document.getElementById('detail');
+  if (!a || !st) return;
+  var lastCode = ROWS[ROWS.length - 1].code;
+  var nextIssue = String(Number(lastCode) + 1);        // 下一期号（按期号顺序递增）
+
+  /* 头部：名称、来源、逻辑、合计命中率 */
+  var html = '<div class="algo-name">' + a.name + '</div>' +
+    '<div class="algo-src">' + a.src + '</div>' +
+    '<div class="algo-logic">' + a.logic + '</div>' +
+    '<div class="rate-line">近 ' + st.rows.length + ' 期十玩法合计中奖率：<b>' +
+      (st.win / st.total * 100).toFixed(1) + '%</b>（中 ' + st.win + ' / ' + st.total + ' 注）' +
+      ' · 奖金合计 ' + money(st.rows.reduce(function (t, r) { return t + r.amt; }, 0)) + ' 元</div>';
+
+  /* AI 自学习：展示大模型接入状态（未接入时说明原因，仍显示本地等价结果） */
+  if (a.ai) {
+    html += '<div class="ai-state ' + (AI_STATE.ok ? 'ok' : 'warn') + '">' + AI_STATE.msg + '</div>';
+  }
+
+  /* 自学习算法：额外列出它当前给各算法分配的权重（近 20 期命中率） */
+  if (a.learn) {
+    var ws = learnWeights(ROWS.length).slice().sort(function (x, y) { return y.rate - x.rate; });
+    html += '<h3 style="margin-top:16px">各算法权重（近 ' + LEARN_W + ' 期推荐 10 号的命中率）</h3>' +
+      '<div class="wgrid">' + ws.map(function (w) {
+        return '<div class="wrow"><span class="wname">' + w.name + '</span>' +
+          '<span class="wrate">' + (w.rate * 100).toFixed(1) + '%</span></div>';
+      }).join('') + '</div>' +
+      '<div class="legend">权重 = 命中率的平方；命中率越高，它推荐的号码在投票中占的分量越大。</div>';
+  }
+
+  /* 下一期预测：10 个号码 + 十玩法各 1 注 */
+  html += '<h3 style="margin-top:16px">第 ' + nextIssue + ' 期预测（每玩法 1 注）</h3>' +
+    ballsHTML(st.next, null, 'pred');
+  var rowsHTML = '';
+  for (var n = 1; n <= 10; n++) {
+    var bet = st.next.slice(0, n);
+    var pl = st.plays[n];
+    var rate = pl.total ? (pl.win / pl.total * 100) : 0;
+    rowsHTML += '<div class="play-row"><span class="play-name">选' + CN[n - 1] + '</span>' +
+      bet.map(function (v) { return '<span class="mini pred">' + pad(v) + '</span>'; }).join('') +
+      '<span class="play-rate">近 ' + st.rows.length + ' 期中 <b>' + pl.win + '</b>/' + pl.total +
+      ' 注 · <b>' + rate.toFixed(1) + '%</b></span></div>';
+  }
+  html += rowsHTML;
+
+  /* 往期回测表：每期预测 10 号、开奖 20 号（命中加深）、逐玩法中奖明细（选几中几 · 奖金）、合计 */
+  var trs = st.rows.slice().reverse().map(function (r) {
+    var hitSet = {};
+    r.rank.forEach(function (v) { hitSet[v] = 1; });
+    var pred = r.rank.map(function (v) { return '<span class="mini pred">' + pad(v) + '</span>'; }).join('');
+    var draw = r.drawn.map(function (v) {
+      return '<span class="mini' + (hitSet[v] ? ' hit' : '') + '">' + pad(v) + '</span>';
+    }).join('');
+    /* 逐玩法列出中奖档位：如「选五 中4 · 21元」「选十 中0 · 2元（全不中）」 */
+    var wins = [];
+    for (var n = 1; n <= 10; n++) {
+      var b = r.bets[n];
+      if (!b || !b.amt) continue;
+      wins.push('选' + CN[n - 1] + ' 中' + b.k + ' · ' + money(b.amt) + '元' +
+        (b.k === 0 ? '（全不中）' : ''));
+    }
+    var detail = wins.length ? wins.join('<br>') : '未中奖';
+    return '<tr><td class="n">' + r.code + '</td><td>' + pred + '</td><td>' + draw + '</td>' +
+      '<td class="detail-cell ' + (wins.length ? 'win' : 'lose') + '">' + detail + '</td>' +
+      '<td class="n ' + (r.winCnt ? 'win' : 'lose') + '">' + r.winCnt + '/10 注</td>' +
+      '<td class="n ' + (r.amt ? 'win' : 'lose') + '">' + money(r.amt) + ' 元</td></tr>';
+  }).join('');
+  html += '<h3 style="margin-top:16px">往期回测（近 ' + st.rows.length + ' 期）</h3>' +
+    '<div class="table-wrap"><table><thead><tr>' +
+    '<th>期号</th><th>预测（10 号）</th><th>开奖号码（金色实心 = 命中）</th>' +
+    '<th>中奖明细（选几 中几 · 奖金）</th><th>中奖注数</th><th>奖金合计</th>' +
+    '</tr></thead><tbody>' + trs + '</tbody></table></div>' +
+    '<div class="legend">开奖号码里金色实心、白字加粗的，就是与本期预测 10 个号码重合的号；其余为淡灰未命中。' +
+    '每玩法 1 注、每注 2 元，共 10 注 / 期；「中奖明细」按玩法列出中奖档位与单注奖金，' +
+    '选七~选十全不中返 2 元显示为「中0（全不中）」。</div>';
+
+  box.innerHTML = html;
+  box.style.display = 'block';
+}
+
+/* 切换算法 */
+function show(id) {
+  cur = id;
+  renderTabs(id);
+  renderDetail(id);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ===================== AI 自学习（大模型） ===================== */
+
+var AI_STATE = { ok: false, msg: '正在请求大模型（首次约需 1 分钟），当前显示本地自学习结果', model: '' };
+
+/* 请求本地服务的 /api/ai_learn；静态站（GitHub Pages）没有该接口，会失败并保留本地结果 */
+function askAI() {
+  var key = 'kl8_ai_learn_' + ROWS[ROWS.length - 1].code;   // 按最新一期缓存，换期自动失效
+  try {
+    var cached = JSON.parse(localStorage.getItem(key) || 'null');
+    if (cached && cached.nums && cached.nums.length >= 10) {   // 命中缓存就不再调用模型
+      AI_STATE = { ok: true, model: cached.model || '',
+                   msg: 'AI 已接入（' + (cached.model || '大模型') + '）：使用本地缓存结果，同一期不重复调用' };
+      RESULTS.ailearn.next = cached.nums.slice(0, 10);
+      return;
+    }
+  } catch (e) { /* 隐私模式下无法读缓存，忽略即可 */ }
+
+  var payload = {
+    weights: learnWeights(ROWS.length).map(function (w) { return { name: w.name, rate: w.rate }; }),
+    draws: ROWS.slice(-50).map(function (r) { return { code: r.code, nums: r.nums }; })
+  };
+  fetch('/api/ai_learn', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(function (r) { return r.json(); }).then(function (d) {
+    if (d && d.ok && d.nums && d.nums.length >= 10) {
+      AI_STATE = { ok: true, model: d.model || '',
+                   msg: 'AI 已接入（' + (d.model || '大模型') + '）：下面 10 个号由大模型结合各算法命中率给出' };
+      RESULTS.ailearn.next = d.nums.slice(0, 10);     // 用模型给的 10 个号替换预测
+      try { localStorage.setItem(key, JSON.stringify({ nums: d.nums.slice(0, 10), model: d.model || '' })); } catch (e) {}
+    } else {
+      AI_STATE = { ok: false, msg: '大模型未接入：' + ((d && d.message) || '未配置') + '；当前显示本地自学习结果', model: '' };
+    }
+  }).catch(function () {
+    AI_STATE = { ok: false, msg: '大模型未接入：线上静态页没有该接口，需在本地启动预测台；当前显示本地自学习结果', model: '' };
+  }).then(function () {
+    renderTabs(cur);
+    /* 大模型不可用时该 Tab 已被隐藏，若正停在它上面就切回本地自学习 */
+    if (cur === 'ailearn' && !AI_STATE.ok) { show('learn'); return; }
+    if (cur === 'ailearn') renderDetail('ailearn');   // 正停在该页时立即刷新显示
+  });
+}
+
+/* ===================== 启动 ===================== */
+
+/* 单次 JSON 请求：失败（含 404、跨域、file:// 直接打开）时抛出，便于换下一个数据源 */
+function requestJSON(url) {
+  return fetch(url, { cache: 'no-store' }).then(function (r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  });
+}
+
+/* 数据来源与其它页面保持一致：优先同目录快照（100 期），失败再请求本地服务接口 */
+function loadData() {
+  return requestJSON('kl8_snapshot.json?t=' + Date.now())
+    .catch(function () { return requestJSON('/api/kl8?issueCount=100'); })
+    .then(function (d) {
+      var list = (d && d.result) || [];
+      if (!list.length) throw new Error('数据为空');
+      return list.map(function (it) {
+        return {
+          code: String(it.code),
+          date: it.date || '',
+          nums: String(it.red).split(',').map(Number).sort(function (a, b) { return a - b; })
+        };
+      });
+    });
+}
+
+loadData().then(function (rows) {
+  ROWS = rows;
+  document.getElementById('status').innerHTML =
+    '已加载 <b>' + rows.length + '</b> 期开奖（' + rows[0].code + ' ~ ' + rows[rows.length - 1].code +
+    '） · 回测 <b>' + BACK + '</b> 期 · 每玩法 <b>1</b> 注';
+  /* 先算好各基础算法逐期推荐（自学习要用），再做逐套回测 */
+  buildBase();
+  ALGOS.forEach(function (a) { RESULTS[a.id] = backtest(a); });
+  askAI();               // 后台尝试接入大模型，成功则替换「AI 自学习」的下一期号码
+  show(ALGOS[0].id);
+}).catch(function (e) {
+  /* 直接双击 html（file://）时浏览器不允许读取本地快照，这里给出明确提示 */
+  var tip = location.protocol === 'file:'
+    ? '当前是直接打开本地文件，无法读取数据。请用「启动预测台.bat」打开，或访问线上地址。'
+    : '请确认 kl8_snapshot.json 与页面同目录，或本地服务 8767 已启动。';
+  document.getElementById('status').innerHTML =
+    '<b style="color:#b04a3a">数据加载失败</b>：' + e + '<br>' + tip;
+});
+</script>
+</body>
+</html>
