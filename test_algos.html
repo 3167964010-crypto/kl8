@@ -761,15 +761,21 @@ function show(id) {
 
 /* ===================== AI 自学习（大模型） ===================== */
 
-var AI_STATE = { ok: false, msg: '正在请求大模型（首次约需 1 分钟），当前显示本地自学习结果', model: '' };
+var AI_STATE = { ok: false, source: '', msg: '正在请求大模型（首次约需 1 分钟），当前显示本地自学习结果', model: '' };
 
 /* 请求本地服务的 /api/ai_learn；静态站没有接口时改读 GitHub Actions 生成的 ai_learn.json */
 function askAI() {
   var key = 'kl8_ai_learn_' + ROWS[ROWS.length - 1].code;   // 按最新一期缓存，换期自动失效
   try {
     var cached = JSON.parse(localStorage.getItem(key) || 'null');
-    if (cached && cached.nums && cached.nums.length >= 10) {   // 命中缓存就不再调用模型
-      useAI(cached.nums, cached.model, '使用本地缓存结果，同一期不重复调用');
+    if (cached && cached.nums && cached.nums.length >= 10) {   // 命中缓存先立即显示
+      useAI(cached.nums, cached.model, '使用本地缓存结果，同一期不重复调用', 'cache');
+      /* 云端可能已重跑过同一期，这里静默读一次文件覆盖（几百字节，不消耗模型额度） */
+      loadCloudAI(true).then(function (fresh) {
+        if (!fresh) return;
+        renderTabs(cur);
+        if (cur === 'ailearn') renderDetail('ailearn');
+      });
       return;
     }
   } catch (e) { /* 隐私模式下无法读缓存，忽略即可 */ }
@@ -784,7 +790,7 @@ function askAI() {
     body: JSON.stringify(payload)
   }).then(function (r) { return r.json(); }).then(function (d) {
     if (d && d.ok && d.nums && d.nums.length >= 10) {
-      useAI(d.nums, d.model, '实时调用大模型生成');
+      useAI(d.nums, d.model, '实时调用大模型生成', 'local');
       return true;
     }
     return false;                                   // 本地接口不可用 → 转云端结果
@@ -794,8 +800,8 @@ function askAI() {
     if (done) return;
     return loadCloudAI();                           // 静态站回退：读定时任务生成的文件
   }).then(function () {
-    /* 只有真的拿到模型号码才缓存，避免把本地兜底结果当成 AI 结果 */
-    if (AI_STATE.ok) {
+    /* 只缓存本地接口的实时结果：云端结果本身就在文件里，下次直接静默读即可 */
+    if (AI_STATE.ok && AI_STATE.source === 'local') {
       try { localStorage.setItem(key, JSON.stringify({ nums: RESULTS.ailearn.next, model: AI_STATE.model })); } catch (e) {}
     }
     renderTabs(cur);
@@ -805,17 +811,18 @@ function askAI() {
   });
 }
 
-/* 记录 AI 结果并写状态条文案 */
-function useAI(nums, model, how) {
+/* 记录 AI 结果并写状态条文案；source 标明来源：local 本地接口 / cloud 云端文件 / cache 浏览器缓存 */
+function useAI(nums, model, how, source) {
   AI_STATE = {
-    ok: true, model: model || '',
+    ok: true, source: source || '', model: model || '',
     msg: 'AI 已接入（' + (model || '大模型') + '｜' + how + '）：下面 10 个号由大模型结合各算法命中率给出'
   };
   RESULTS.ailearn.next = nums.slice(0, 10);
 }
 
-/* 静态站回退：读 GitHub Actions 定时生成的 ai_learn.json（期号对不上视为过期） */
-function loadCloudAI() {
+/* 静态站回退：读 GitHub Actions 定时生成的 ai_learn.json（期号对不上视为过期）
+   silent=true 时只尝试覆盖，失败不打扰已有结果（用于缓存命中后的静默刷新） */
+function loadCloudAI(silent) {
   var nextIssue = String(parseInt(ROWS[ROWS.length - 1].code, 10) + 1);
   return fetch('ai_learn.json?t=' + Date.now()).then(function (r) {
     if (!r.ok) throw new Error('没有 ai_learn.json');
@@ -823,12 +830,15 @@ function loadCloudAI() {
   }).then(function (d) {
     if (!d || !d.nums || d.nums.length < 10) throw new Error('文件里没有号码');
     if (d.issue && d.issue !== nextIssue) throw new Error('云端结果是第 ' + d.issue + ' 期，已过期');
-    useAI(d.nums, d.model, '云端定时生成 ' + (d.generated_at || ''));
+    useAI(d.nums, d.model, '云端定时生成 ' + (d.generated_at || ''), 'cloud');
+    return true;
   }).catch(function (err) {
+    if (silent) return false;                         // 静默模式：保留当前显示，不覆盖状态条
     AI_STATE = {
-      ok: false, model: '',
+      ok: false, source: '', model: '',
       msg: '大模型未接入：' + err.message + '；当前显示本地自学习结果（权重口径相同）'
     };
+    return false;
   });
 }
 
