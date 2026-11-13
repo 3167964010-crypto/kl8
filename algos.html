@@ -228,8 +228,7 @@
   .bet-row.none{color:var(--muted);font-size:11px;border-bottom:none;}
   .bet-idx{flex:0 0 14px;text-align:right;color:var(--muted);font-size:10px;}
   .bet-num{display:inline-block;min-width:21px;font-variant-numeric:tabular-nums;}
-  /* 中奖档位小字 + 单注"中几个"标签 */
-  .tier-line{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.6;}
+  /* 单注"中几个"标签 */
   .bet-tier{margin-left:auto;font-size:10px;color:#8a5a12;font-weight:700;}
   .ten-grid{grid-template-columns:repeat(auto-fill,minmax(290px,1fr));}
   @media (max-width:640px){.ten-grid{grid-template-columns:1fr;}.bet-row{font-size:11px;}}
@@ -497,16 +496,6 @@ function playWins(rec, n) {
     return prizeAmount(n, k) > 0;
   });
 }
-// 把各中奖档位的注数整理成一行文字（0 档 = 一个都没中，福彩返 2 元）
-function tierText(tiers) {
-  if (!tiers) return '—';
-  var keys = Object.keys(tiers).filter(function (k) { return tiers[k] > 0; })
-    .sort(function (a, b) { return Number(b) - Number(a); });
-  if (!keys.length) return '暂无中奖';
-  return keys.map(function (k) {
-    return (k === '0' ? '全不中' : '中' + k) + ' ' + tiers[k] + ' 注';
-  }).join(' · ');
-}
 // 渲染一组"10 注"行；win=true 时用中奖样式，传入开奖号码则标出该注是"中几个"
 function betRows(list, win, act) {
   return list.map(function (b, i) {
@@ -594,7 +583,6 @@ function renderAlgo() {
           '</span><span class="ten-count">中 ' + (per ? per.win : 0) + ' / ' + all.length + ' 注</span></div>' +
           '<div class="bet-head">第 ' + lastRec.target + ' 期 · 开奖结果对照</div>' +
           '<div class="bet-list">' + (rowsAll || '<div class="bet-row none">无记录</div>') + '</div>' +
-          '<div class="tier-line">该期档位：' + tierText(per ? per.tiers : null) + '</div>' +
           foot + '</div>';
       }).join('') + '</div>';
   }
