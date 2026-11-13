@@ -305,11 +305,13 @@ def prize_amount(n, k):
     return PRIZE_TABLE.get(n, {}).get(k, 0)
 
 
-def play_bets(ranked, n, count=10):
+def play_bets(ranked, n, count=None):
     """
     为某玩法生成 count 注号码：每注取 n 个连续名次，相邻注错开一位。
-    这样 10 注覆盖的名次范围更宽，且不会出现完全相同的注。
+    这样 5 注覆盖的名次范围更宽，且不会出现完全相同的注。
     """
+    if not count:
+        count = BETS_PER_PLAY
     pool = list(ranked)
     if len(pool) < n + count - 1:          # 排序号码不足时用全号池补齐
         pool += [x for x in range(1, 81) if x not in pool]
@@ -559,6 +561,20 @@ def settle_and_predict():
                 rec["bets"] = {str(n): play_bets(order, n) for n in range(1, 11)}
                 changed = True
 
+    # 迁移：每玩法注数改为 5 后，旧的 10 注记录按该期之前的数据重建排序再取号
+    for rec in state["history"]:
+        if not rec.get("settled") or not rec.get("picks10"):
+            continue
+        if not bets_need_rebuild(rec.get("bets")):
+            continue
+        idx = pos.get(rec["target_issue"])
+        if idx is None:
+            continue
+        before = rows[:idx]
+        order = list(rec["picks10"]) + [x for x in ranked_numbers(before) if x not in rec["picks10"]]
+        rec["bets"] = {str(n): play_bets(order, n) for n in range(1, 11)}
+        changed = True
+
     # 最近一期已开奖的"当期 10 注"逐注结果（当期口径，卡片只展示这一期）
     last_play = None
     for rec in sorted((r for r in state["history"]
@@ -665,11 +681,20 @@ ALGOS = [
     ("prev", "上期规律", "以上一期号码为基准：重号 4 个 + 邻号 3 个 + 同尾号 3 个，跟随最近一期结构"),
     ("random", "随机对照", "以期号为种子的固定随机序列，作为基准线"),
     ("consensus", "重复号码", "统计以上各套算法同一期共同推荐的号码，按被推荐次数（票数）排序"),
-    ("overlap", "高频重合", "统计其余 7 套算法十种玩法全部注里各号码的出现次数，按重合度重新排序"),
+    ("overlap", "高频重合", "统计前八套算法各自前 10 推荐中被同时选中的号码，按推荐它的算法套数（票数）排序"),
 ]
 
 CONSENSUS_ID = "consensus"      # 重复号码算法的 id，需要特殊处理（汇总其他算法）
-OVERLAP_ID = "overlap"          # 高频重合算法的 id，依赖其余算法的"每玩法 10 注"结果
+OVERLAP_ID = "overlap"          # 高频重合算法的 id，依赖前八套算法的主推号
+BETS_PER_PLAY = 5               # 每种玩法预测的注数（选一~选十各 5 注）
+CFG_VERSION = "v2-5bets-overlap8"   # 算法配置版本：升级时清空受影响的缓存结果并按新规则重算
+
+
+def bets_need_rebuild(bets):
+    """每玩法注数配置变化后，旧记录（曾为 10 注）需要按新注数重建"""
+    if not bets:
+        return True
+    return any(len(bets.get(str(n)) or []) != BETS_PER_PLAY for n in range(1, 11))
 
 
 def load_json(path, default):
@@ -881,36 +906,35 @@ def consensus_history(st, box):
 
 def overlap_votes(st, issue):
     """
-    统计某一期"其余算法十种玩法全部注"里各号码出现的次数（重合度）。
-    只用 7 套基础算法，跳过"重复号码/高频重合"这两个汇总算法，避免互相放大。
+    统计某一期"前八套算法各自前 10 推荐"的号码票数：
+    某个号码被几套算法同时推荐，就记几票（最多 8 票）。
+    只取算法清单前八套，跳过"高频重合"自身，避免自我放大。
     """
     votes = {}
-    for aid, _name, _desc in ALGOS:
-        if aid in (CONSENSUS_ID, OVERLAP_ID):
+    for aid, _name, _desc in ALGOS[:8]:
+        if aid == OVERLAP_ID:
             continue
         for rec in (st["algos"].get(aid) or {}).get("history", []):
             if rec.get("target") != issue:
                 continue
-            for n in range(1, 11):
-                for bet in ((rec.get("bets") or {}).get(str(n)) or []):
-                    for v in bet:
-                        votes[v] = votes.get(v, 0) + 1
+            for v in (rec.get("picks10") or []):
+                votes[v] = votes.get(v, 0) + 1
             break
     return votes
 
 
 def overlap_history(st, box):
     """
-    回填"高频重合"算法往期记录：用其余算法同一期全部注重新计票，
+    回填"高频重合"算法往期记录：用前八套算法同一期的主推号重新计票，
     使它的中奖率一开始就有与其它算法相同的样本量。
     """
     have = {r["target"] for r in box["history"]}
     issues = set()
-    for aid, _name, _desc in ALGOS:
-        if aid in (CONSENSUS_ID, OVERLAP_ID):
+    for aid, _name, _desc in ALGOS[:8]:
+        if aid == OVERLAP_ID:
             continue
         for rec in (st["algos"].get(aid) or {}).get("history", []):
-            if rec.get("bets"):
+            if rec.get("picks10"):
                 issues.add(rec["target"])
     added = False
     for iss in sorted(issues):
@@ -942,6 +966,11 @@ def settle_algos(rows):
     next_issue = str(int(rows[-1]["code"]) + 1)
     st = load_json(ALGO_FILE, {"algos": {}})
     changed = False
+    # 配置升级（每玩法 5 注 / 高频重合改为前八套主推号）：旧的汇总结果作废，按新规则重算
+    if st.get("cfg_version") != CFG_VERSION:
+        st["algos"].pop(OVERLAP_ID, None)
+        st["cfg_version"] = CFG_VERSION
+        changed = True
     llm_cache = {"picks": None, "tried": False}     # 大模型每次请求最多调用一次
     out = []
     for aid, name, desc in ALGOS:
@@ -961,7 +990,7 @@ def settle_algos(rows):
                     changed = True
                 # 每玩法 10 注：只用以该期之前的数据重算排序再滑窗取号，
                 # 方便开奖后在本期记录上展示每个玩法的中奖号码
-                if "bets" not in rec:
+                if bets_need_rebuild(rec.get("bets")):
                     before = rows[:pos.get(rec["target"], len(rows))]
                     if len(before) < 20:
                         before = rows[:20]
@@ -1041,7 +1070,7 @@ def settle_algos(rows):
             box["history"].append(cur)
             changed = True
         # 当前预测也要有"每玩法 10 注"：前 10 用本算法推荐，其余号码按同算法评分补齐
-        if cur is not None and "bets" not in cur:
+        if cur is not None and bets_need_rebuild(cur.get("bets")):
             order = algo_order(rows, aid, algo_stats(rows), cur.get("picks10") or [])
             cur["bets"] = {str(n): play_bets(order, n) for n in range(1, 11)}
             changed = True

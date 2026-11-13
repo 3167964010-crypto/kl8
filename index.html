@@ -1073,7 +1073,7 @@ function renderPredict(p) {
   el.innerHTML =
     '<div class="ai-cur">' +
       '<div><div class="bt-dim">第 ' + (cur.target_issue || '—') + ' 期预测（基于第 ' + (cur.based_on || '—') + ' 期数据生成）</div>' +
-      '<div class="bt-dim" style="margin-top:4px;font-size:11px">每个玩法各推 10 注（按推荐度滑窗取号），命中率按上一期这 10 注的实际开奖结果统计</div></div>' +
+      '<div class="bt-dim" style="margin-top:4px;font-size:11px">每个玩法各推 5 注（按推荐度滑窗取号），命中率按上一期这 5 注的实际开奖结果统计</div></div>' +
       '<div class="ai-side"><div class="ai-logic">' + (cur.logic || '') + '</div>' +
       '<div class="bt-dim">模型：' + (cur.method || '') + ' · 输入模型的数据样本：' + (cur.ctx || '—') + ' 期开奖数据</div></div>' +
     '</div>' +
@@ -1141,7 +1141,7 @@ function buildTenGrid(picks10, footFn, betsMap, issue) {
     }).join('');
     return '<div class="ten-card">' +
       '<div class="ten-title">选' + cn[n - 1] +
-        '<span class="ten-count">共 10 注</span>' + copyBtnHTML(list) + '</div>' +
+        '<span class="ten-count">共 ' + (list ? list.length : 5) + ' 注</span>' + copyBtnHTML(list) + '</div>' +
       '<div class="bet-list">' + head + rows + '</div>' +
       (footFn ? footFn(n) : '') +
       '</div>';

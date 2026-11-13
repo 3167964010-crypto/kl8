@@ -253,9 +253,9 @@
   <div class="card" id="algoCard"><div class="dim">加载中…</div></div>
 
   <div class="note">
-    <strong>使用方法：</strong>每期开奖后，各套算法各自自动生成下一期预测（每种玩法各 10 注：按排序滑窗取号），
+    <strong>使用方法：</strong>每期开奖后，各套算法各自自动生成下一期预测（每种玩法各 5 注：按排序滑窗取号），
     开奖后自动结算。观察若干期后，对比各套的滚动命中率，再决定主用哪一套。
-    <strong>命中率口径：</strong>"10 注命中率"= 拿到任意奖金的注数 ÷ 总注数；中奖档位里的"全不中"指一个号都没中（福彩选七~选十返 2 元），也计入中奖注。
+    <strong>命中率口径：</strong>"中奖注数"= 拿到任意奖金的注数；中奖档位里的"全不中"指一个号都没中（福彩选七~选十返 2 元），也计入中奖注。
     <strong>上期规律算法：</strong>以上一期开出的 20 个号码为基准打分——重号（上期开出）权重最高，其次是上期号码的邻号（±1），再次是同尾号，其余号码作为补位按号码顺序补齐。
     <strong>随机对照组是基准线</strong>：任何算法若长期跑不赢它，说明该算法没有实际效力。
     选一的理论命中率为 25%，各算法命中率围绕它波动属正常现象。
@@ -369,8 +369,8 @@ function renderTabs() {
     // 选中态用柔和投影替代霓虹光晕
     var style = on ? ' style="border-color:' + c + ';box-shadow:0 2px 10px ' + c + '33;"' : '';
     var sk = streakInfo(a.history);
-    // 主数字：十种玩法各 10 注的合计中奖率；下面小字再附选一口径，避免误读
-    var sub = comb ? '十玩法10注 中 ' + comb.win + '/' + comb.cnt + ' 注' : '暂无已开奖期';
+    // 主数字：十种玩法各 5 注的合计中奖率；下面小字再附选一口径，避免误读
+    var sub = comb ? '十玩法合计 中 ' + comb.win + '/' + comb.cnt + ' 注' : '暂无已开奖期';
     var sub2 = a.total ? '选一 ' + (a.rate === null ? '—' : a.rate + '%') + ' · 预测 ' + a.total + ' 期 · 命中 ' + (a.hits || 0) + ' 期' : '';
     if (a.total && sk.miss > 0) { sub2 += ' · 连续 ' + sk.miss + ' 期未中'; }
     else if (a.total && sk.hit > 0) { sub2 += ' · 连续 ' + sk.hit + ' 期命中'; }
@@ -563,14 +563,14 @@ function renderAlgo() {
           '<div class="tier-line">该期档位：' + tierText(per.tiers) + '</div>'
         : '<div class="ten-row"><span>暂无已开奖记录</span><b>—</b></div>');
     return '<div class="ten-card"><div class="ten-title"><span style="color:' + c + ';">选' + cn[n - 1] +
-      '</span><span class="ten-count">共 10 注</span>' + copyBtnHTML(list) + '</div>' +
+      '</span><span class="ten-count">共 ' + (list ? list.length : 5) + ' 注</span>' + copyBtnHTML(list) + '</div>' +
       '<div class="bet-list">' + betRows(list) + '</div>' + foot + '</div>';
   }).join('');
   // 最近一期开奖对照：十种玩法各列出全部 10 注，命中号码加深，并给每注金额与合计盈亏
   var winSection = '';
   if (lastRec) {
     winSection = '<div class="dim" style="margin-top:16px;">第 ' + lastRec.target +
-      ' 期开奖对照（全部 10 注，加深 = 命中的号码）：</div><div class="ten-grid">' +
+      ' 期开奖对照（全部 5 注，加深 = 命中的号码）：</div><div class="ten-grid">' +
       [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (n) {
         var all = (lastRec.bets || {})[String(n)] || [];
         var act = lastRec.actual || [];
@@ -590,7 +590,9 @@ function renderAlgo() {
             '<span class="bet-amt' + (amt > 0 ? '' : ' zero') + '">' + label + '</span></div>';
         }).join('');
         var cost = all.length * 2;            // 每注 2 元
-        var diff = totalAmt - cost;
+        // 奖金有 4.6 元这类小数，累加后做一次四舍五入，避免出现 -0.8000000000000007
+        totalAmt = Math.round(totalAmt * 10) / 10;
+        var diff = Math.round((totalAmt - cost) * 10) / 10;
         var foot = '<div class="bet-foot"><span>中奖合计 <b>' + totalAmt + ' 元</b></span>' +
           '<span>成本 <b>' + cost + ' 元</b></span>' +
           '<span>盈亏 <b class="' + (diff >= 0 ? 'pos' : 'neg') + '">' +
@@ -644,7 +646,7 @@ function renderAlgo() {
     '<div class="algo-head"><span class="algo-name" style="color:' + c + ';text-shadow:0 0 12px ' + c + '66;">' +
       a.name + '</span><span class="algo-desc">' + a.desc + ' · 模型：' + (cur.method || '') + '</span></div>' +
     '<div class="rate-line">第 ' + cur.target + ' 期预测</div>' +
-    '<div class="dim">十种玩法 10 注合计中奖率（累计已开奖期）：' +
+    '<div class="dim">十种玩法合计中奖率（每玩法 5 注，累计已开奖期）：' +
       (combinedRate(a) ? '<b>' + combinedRate(a).rate + '%</b>（中 ' + combinedRate(a).win + ' / ' +
         combinedRate(a).cnt + ' 注）' : '—') +
       ' · 选一滚动命中率：' + rateTxt + '</div>' +
@@ -656,7 +658,7 @@ function renderAlgo() {
     '<div class="pickline">' + pickline +
       '<button class="copy-btn" data-copy=\'' + JSON.stringify(cur.picks10 || []) + '\' style="align-self:center">复制前10</button>' +
     '</div>' +
-    '<div class="dim" style="margin-top:12px;">每种玩法各 10 注（按本算法排序滑窗取号）：</div>' +
+    '<div class="dim" style="margin-top:12px;">每种玩法各 5 注（按本算法排序滑窗取号）：</div>' +
     '<div class="ten-grid">' + grid + '</div>' +
     winSection +
     '<div class="dim" style="margin-top:12px;">历史对照：橙色 = 预测号码，紫色 = 开奖命中，灰色 = 开奖未中。</div>' +
