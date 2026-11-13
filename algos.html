@@ -89,6 +89,21 @@
   .ten-tier b{color:var(--accent2);font-weight:700;}
   .ten-row{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:2px;}
   .ten-row b{color:var(--ink);font-variant-numeric:tabular-nums;}
+  /* 开奖对照：全部 10 注都列出，命中号码加深，每注标金额 */
+  .bet-head{font-size:11px;color:var(--muted);margin:2px 0 6px;}
+  .bet-num.hit{background:rgba(154,106,26,.22);color:#5b3d08;font-weight:800;border-radius:4px;}
+  .bet-amt{margin-left:auto;font-size:10px;color:#8a5a12;font-weight:700;white-space:nowrap;}
+  .bet-amt.zero{color:var(--muted);font-weight:400;}
+  .bet-foot{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--muted);
+            border-top:1px dashed var(--rule);padding-top:6px;margin-top:6px;}
+  .bet-foot b{color:var(--ink);}
+  .bet-foot .pos{color:#2f7d5a;}
+  .bet-foot .neg{color:#b4452f;}
+  /* 十种玩法各自的累计命中率（选一~选十） */
+  .play-rates{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .play-rates span{font-size:11px;color:var(--muted);border:1px solid var(--rule);border-radius:6px;
+                   padding:2px 7px;background:rgba(2,132,199,.04);}
+  .play-rates b{color:var(--ink);font-variant-numeric:tabular-nums;}
   @media (max-width:820px){.ten-grid{grid-template-columns:repeat(2,1fr);}}
 
   /* === 带标注的预测号码（各算法独立 UI） === */
@@ -333,25 +348,37 @@ function loadAlgos() {
 }
 
 // 渲染 6 个 Tab（各自主题色 + 命中率 + 盈亏）
+// 十玩法 10 注合计中奖率（累计所有已开奖期：中奖注数 / 总注数）
+function combinedRate(a) {
+  var w = 0, c = 0;
+  var pr = a.play_rates || {};
+  Object.keys(pr).forEach(function (k) {
+    w += Number((pr[k] || {}).win || 0);
+    c += Number((pr[k] || {}).cnt || 0);
+  });
+  if (!c) return null;
+  return { win: w, cnt: c, rate: Math.round(w / c * 1000) / 10 };
+}
+
 function renderTabs() {
   document.getElementById('tabs').innerHTML = DATA.algos.map(function (a) {
-    var rate = a.rate === null ? '—' : a.rate + '%';
+    var comb = combinedRate(a);
+    var rate = comb ? comb.rate + '%' : '—';
     var c = COLORS[a.id] || '#0284c7';
     var on = a.id === ACTIVE;
     // 选中态用柔和投影替代霓虹光晕
     var style = on ? ' style="border-color:' + c + ';box-shadow:0 2px 10px ' + c + '33;"' : '';
     var sk = streakInfo(a.history);
-    // 期数只统计"已开奖结算"的期数，未开奖那期不参与命中判断
-    var sub = a.total ? '预测 ' + a.total + ' 期 · 命中 ' + (a.hits || 0) + ' 期' : '暂无已开奖期';
-    // 当前连续状态：命中写"连续 N 期命中"，中断写"连续 N 期未中"，与详情口径一致
-    if (a.total) {
-      sub += sk.hit > 0 ? ' · 连续 ' + sk.hit + ' 期命中'
-                        : (sk.miss > 0 ? ' · 连续 ' + sk.miss + ' 期未中' : '');
-    }
+    // 主数字：十种玩法各 10 注的合计中奖率；下面小字再附选一口径，避免误读
+    var sub = comb ? '十玩法10注 中 ' + comb.win + '/' + comb.cnt + ' 注' : '暂无已开奖期';
+    var sub2 = a.total ? '选一 ' + (a.rate === null ? '—' : a.rate + '%') + ' · 预测 ' + a.total + ' 期 · 命中 ' + (a.hits || 0) + ' 期' : '';
+    if (a.total && sk.miss > 0) { sub2 += ' · 连续 ' + sk.miss + ' 期未中'; }
+    else if (a.total && sk.hit > 0) { sub2 += ' · 连续 ' + sk.hit + ' 期命中'; }
     return '<div class="tab' + (on ? ' on' : '') + '" data-id="' + a.id + '"' + style + '>' +
       '<span style="color:' + c + ';">● </span>' + a.name +
       '<div class="trate" style="color:' + c + ';">' + rate + '</div>' +
-      '<small>' + sub + '</small></div>';
+      '<small>' + sub + '</small>' +
+      (sub2 ? '<small>' + sub2 + '</small>' : '') + '</div>';
   }).join('');
   var tabs = document.querySelectorAll('.tab');
   for (var i = 0; i < tabs.length; i++) {
@@ -528,28 +555,52 @@ function renderAlgo() {
     }
     // 当期结果：上一期这 10 注实际中了几注（未开奖则显示待开奖）
     var per = lastRec ? periodStats(list, lastRec.actual, n) : null;
-    var foot = per
-      ? '<div class="ten-row"><span>上一期（第 ' + lastRec.target + ' 期）10 注</span><b>中 ' +
-        per.win + ' / ' + per.cnt + ' 注（' + Math.round(per.win / per.cnt * 100) + '%）</b></div>' +
-        '<div class="tier-line">该期档位：' + tierText(per.tiers) + '</div>'
-      : '<div class="ten-row"><span>当期 10 注</span><b>待开奖</b></div>';
+    // 先明确"这批号码是哪一期"，再单独给上一期结果，避免误把旧结果套在新号码上
+    var foot = '<div class="bet-head">第 ' + cur.target + ' 期预测 · 待开奖</div>' +
+      (per
+        ? '<div class="ten-row"><span>上一期 第 ' + lastRec.target + ' 期结果</span><b>中 ' +
+          per.win + ' / ' + per.cnt + ' 注（' + Math.round(per.win / per.cnt * 100) + '%）</b></div>' +
+          '<div class="tier-line">该期档位：' + tierText(per.tiers) + '</div>'
+        : '<div class="ten-row"><span>暂无已开奖记录</span><b>—</b></div>');
     return '<div class="ten-card"><div class="ten-title"><span style="color:' + c + ';">选' + cn[n - 1] +
       '</span><span class="ten-count">共 10 注</span>' + copyBtnHTML(list) + '</div>' +
       '<div class="bet-list">' + betRows(list) + '</div>' + foot + '</div>';
   }).join('');
-  // 最近一期开奖对照：每种玩法 10 注里哪些注中奖（金色）
+  // 最近一期开奖对照：十种玩法各列出全部 10 注，命中号码加深，并给每注金额与合计盈亏
   var winSection = '';
   if (lastRec) {
     winSection = '<div class="dim" style="margin-top:16px;">第 ' + lastRec.target +
-      ' 期开奖对照（金色 = 该玩法中奖的注）：</div><div class="ten-grid">' +
+      ' 期开奖对照（全部 10 注，加深 = 命中的号码）：</div><div class="ten-grid">' +
       [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (n) {
-        var wins = playWins(lastRec, n);
-        var total = ((lastRec.bets || {})[String(n)] || []).length;
-        var per = periodStats((lastRec.bets || {})[String(n)] || [], lastRec.actual, n);
+        var all = (lastRec.bets || {})[String(n)] || [];
+        var act = lastRec.actual || [];
+        var per = periodStats(all, act, n);
+        // 逐注算中奖金额，同时累计该玩法本期中奖总额
+        var totalAmt = 0;
+        var rowsAll = all.map(function (b, i) {
+          var k = b.filter(function (x) { return act.indexOf(x) >= 0; }).length;
+          var amt = prizeAmount(n, k);
+          totalAmt += amt;
+          var nums = b.map(function (x) {
+            return '<span class="bet-num' + (act.indexOf(x) >= 0 ? ' hit' : '') + '">' + pad(x) + '</span>';
+          }).join('');
+          // 金额文案：0 个号中也可能有"全不中返 2 元"这一档
+          var label = amt > 0 ? ((k === 0 ? '全不中' : '中' + k) + ' · ' + amt + ' 元') : '未中';
+          return '<div class="bet-row"><span class="bet-idx">' + (i + 1) + '</span>' + nums +
+            '<span class="bet-amt' + (amt > 0 ? '' : ' zero') + '">' + label + '</span></div>';
+        }).join('');
+        var cost = all.length * 2;            // 每注 2 元
+        var diff = totalAmt - cost;
+        var foot = '<div class="bet-foot"><span>中奖合计 <b>' + totalAmt + ' 元</b></span>' +
+          '<span>成本 <b>' + cost + ' 元</b></span>' +
+          '<span>盈亏 <b class="' + (diff >= 0 ? 'pos' : 'neg') + '">' +
+          (diff >= 0 ? '+' : '') + diff + ' 元</b></span></div>';
         return '<div class="ten-card"><div class="ten-title"><span style="color:' + c + ';">选' + cn[n - 1] +
-          '</span><span class="ten-count">中 ' + wins.length + ' / ' + total + ' 注</span></div>' +
-          (wins.length ? betRows(wins, true, lastRec.actual) : '<div class="bet-row none">本期未中奖</div>') +
-          '<div class="tier-line">该期档位：' + tierText(per ? per.tiers : null) + '</div></div>';
+          '</span><span class="ten-count">中 ' + (per ? per.win : 0) + ' / ' + all.length + ' 注</span></div>' +
+          '<div class="bet-head">第 ' + lastRec.target + ' 期 · 开奖结果对照</div>' +
+          '<div class="bet-list">' + (rowsAll || '<div class="bet-row none">无记录</div>') + '</div>' +
+          '<div class="tier-line">该期档位：' + tierText(per ? per.tiers : null) + '</div>' +
+          foot + '</div>';
       }).join('') + '</div>';
   }
   // 滚动命中率
@@ -583,10 +634,21 @@ function renderAlgo() {
     return '<tr><td class="n">' + r.target + '</td><td>' + nums + copyBtnHTML(r.picks10) + '</td>' +
       '<td>' + actHtml + '</td><td>' + st + '</td><td class="n">' + cell(5) + '</td><td class="n">' + cell(10) + '</td></tr>';
   }).join('');
+  // 十种玩法各自的累计命中率（选一~选十），数据来自后端 play_rates
+  var prRow = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (n) {
+    var p = (a.play_rates || {})[String(n)];
+    var txt = (p && p.cnt) ? p.rate + '%' : '—';
+    return '<span>选' + cn[n - 1] + ' <b>' + txt + '</b></span>';
+  }).join('');
   document.getElementById('algoCard').innerHTML =
     '<div class="algo-head"><span class="algo-name" style="color:' + c + ';text-shadow:0 0 12px ' + c + '66;">' +
       a.name + '</span><span class="algo-desc">' + a.desc + ' · 模型：' + (cur.method || '') + '</span></div>' +
-    '<div class="rate-line">第 ' + cur.target + ' 期预测 · 滚动命中率：' + rateTxt + '</div>' +
+    '<div class="rate-line">第 ' + cur.target + ' 期预测</div>' +
+    '<div class="dim">十种玩法 10 注合计中奖率（累计已开奖期）：' +
+      (combinedRate(a) ? '<b>' + combinedRate(a).rate + '%</b>（中 ' + combinedRate(a).win + ' / ' +
+        combinedRate(a).cnt + ' 注）' : '—') +
+      ' · 选一滚动命中率：' + rateTxt + '</div>' +
+    '<div class="play-rates">' + prRow + '</div>' +
     '<div class="streak-line">连续命中 <b>' + sk.hit + '</b> 期 · ' +
       '<span class="miss">连续未中 <b>' + sk.miss + '</b> 期</span> · ' +
       '累计未中 <b>' + sk.missTotal + '</b> / ' + sk.settled + ' 期</div>' +
