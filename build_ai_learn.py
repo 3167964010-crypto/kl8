@@ -40,6 +40,18 @@ def main():
         print("拉取开奖数据失败，跳过 AI 自学习生成")
         return
 
+    # 同一期只生成一次：定时任务窗口内每 10 分钟会跑一次，没有新开奖就不必重复调用模型
+    next_issue = str(int(rows[-1]["code"]) + 1)
+    if not os.environ.get("KL8_AI_FORCE"):
+        try:
+            with open(OUT_FILE, "r", encoding="utf-8") as f:
+                old = json.load(f)
+            if old.get("issue") == next_issue and old.get("based") == rows[-1]["code"]:
+                print("第 %s 期已有 AI 结果（基于 %s），跳过" % (next_issue, old["based"]))
+                return
+        except Exception:
+            pass
+
     # 各算法近期表现：用快照里的滚动命中率，越高说明这套逻辑近期越准
     weights = []
     try:
