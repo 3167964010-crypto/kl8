@@ -987,11 +987,11 @@ function loadData() {
       loadLlmConf();   // 同步刷新大模型配置状态
     })
     .catch(function (err) {
-      statusEl.textContent = '同步失败：' + err.message + '（请用「启动预测台.bat」打开）';
+      statusEl.textContent = '同步失败：' + err.message + '（下拉刷新重试）';
       document.getElementById('dot').style.background = '#8d857a';
       document.getElementById('probNote').innerHTML =
-        '<strong>同步失败提示：</strong>浏览器出于跨域限制无法直接访问福彩官网。' +
-        '请双击文件夹中的「启动预测台.bat」启动本地同步服务，再通过自动打开的页面使用（地址为 http://127.0.0.1:8767/）。';
+        '<strong>同步失败提示：</strong>多为网络抖动或页面刚更新，下拉刷新一次即可；' +
+        '若一直失败，可清除本站缓存后再打开。';
     })
     .finally(function () {
       btn.disabled = false;

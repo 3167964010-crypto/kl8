@@ -229,7 +229,7 @@
     <a class="navlink" href="index.html">← 返回预测台</a>
     <a class="navlink" href="prize.html">奖金统计</a>
   </header>
-  <div class="statusbar" id="statusbar"><span class="dot"></span><span id="status">正在加载 7 套算法预测…</span></div>
+  <div class="statusbar" id="statusbar"><span class="dot"></span><span id="status">正在加载算法预测…</span></div>
 
   <!-- 算法 Tab 栏 -->
   <div class="tabs" id="tabs"></div>
@@ -299,7 +299,7 @@ function histHead() {
   }).join('') + '</tr>';
 }
 
-// 拉取 6 套算法状态
+// 拉取各套算法状态
 function loadAlgos() {
   // 优先本地接口；静态托管（无接口）时回退到预生成的 algos_snapshot.json
   fetch('/api/algos', { cache: 'no-store' })
@@ -319,9 +319,16 @@ function loadAlgos() {
       renderAlgo();
     })
     .catch(function (e) {
-      document.getElementById('status').textContent = '加载失败：' + e.message;
+      // 首次失败多为部署刚更新/网络抖动，自动重试一次再报错
+      if (!loadAlgos.retried) {
+        loadAlgos.retried = true;
+        document.getElementById('status').textContent = '网络较慢，正在重试…';
+        setTimeout(loadAlgos, 1800);
+        return;
+      }
+      document.getElementById('status').textContent = '加载失败：' + e.message + '（下拉刷新重试）';
       document.getElementById('algoCard').innerHTML =
-        '<div class="dim">无法获取算法数据（需通过本地同步服务访问，请用「启动预测台.bat」打开）。</div>';
+        '<div class="dim">无法获取算法数据，请下拉刷新；若持续失败，可清除本站缓存后再试。</div>';
     });
 }
 
