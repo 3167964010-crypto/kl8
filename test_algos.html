@@ -689,8 +689,9 @@ function renderDetail(id) {
     html += '<div class="ai-state ' + (AI_STATE.ok ? 'ok' : 'warn') + '">' + AI_STATE.msg + '</div>';
   }
 
-  /* 自学习算法：额外列出它当前给各算法分配的权重（近 20 期命中率） */
-  if (a.learn) {
+  /* 自学习算法：额外列出它当前给各算法分配的权重（近 20 期命中率）
+     AI 自学习的权重由云端生成（来自正式页 9 套算法），这里不重复展示 */
+  if (a.learn && !a.ai) {
     var ws = learnWeights(ROWS.length).slice().sort(function (x, y) { return y.rate - x.rate; });
     html += '<h3 style="margin-top:16px">各算法权重（近 ' + LEARN_W + ' 期推荐 10 号的命中率）</h3>' +
       '<div class="wgrid">' + ws.map(function (w) {
@@ -762,15 +763,13 @@ function show(id) {
 
 var AI_STATE = { ok: false, msg: '正在请求大模型（首次约需 1 分钟），当前显示本地自学习结果', model: '' };
 
-/* 请求本地服务的 /api/ai_learn；静态站（GitHub Pages）没有该接口，会失败并保留本地结果 */
+/* 请求本地服务的 /api/ai_learn；静态站没有接口时改读 GitHub Actions 生成的 ai_learn.json */
 function askAI() {
   var key = 'kl8_ai_learn_' + ROWS[ROWS.length - 1].code;   // 按最新一期缓存，换期自动失效
   try {
     var cached = JSON.parse(localStorage.getItem(key) || 'null');
     if (cached && cached.nums && cached.nums.length >= 10) {   // 命中缓存就不再调用模型
-      AI_STATE = { ok: true, model: cached.model || '',
-                   msg: 'AI 已接入（' + (cached.model || '大模型') + '）：使用本地缓存结果，同一期不重复调用' };
-      RESULTS.ailearn.next = cached.nums.slice(0, 10);
+      useAI(cached.nums, cached.model, '使用本地缓存结果，同一期不重复调用');
       return;
     }
   } catch (e) { /* 隐私模式下无法读缓存，忽略即可 */ }
@@ -785,20 +784,51 @@ function askAI() {
     body: JSON.stringify(payload)
   }).then(function (r) { return r.json(); }).then(function (d) {
     if (d && d.ok && d.nums && d.nums.length >= 10) {
-      AI_STATE = { ok: true, model: d.model || '',
-                   msg: 'AI 已接入（' + (d.model || '大模型') + '）：下面 10 个号由大模型结合各算法命中率给出' };
-      RESULTS.ailearn.next = d.nums.slice(0, 10);     // 用模型给的 10 个号替换预测
-      try { localStorage.setItem(key, JSON.stringify({ nums: d.nums.slice(0, 10), model: d.model || '' })); } catch (e) {}
-    } else {
-      AI_STATE = { ok: false, msg: '大模型未接入：' + ((d && d.message) || '未配置') + '；当前显示本地自学习结果', model: '' };
+      useAI(d.nums, d.model, '实时调用大模型生成');
+      return true;
     }
+    return false;                                   // 本地接口不可用 → 转云端结果
   }).catch(function () {
-    AI_STATE = { ok: false, msg: '大模型未接入：线上静态页没有该接口，需在本地启动预测台；当前显示本地自学习结果', model: '' };
+    return false;
+  }).then(function (done) {
+    if (done) return;
+    return loadCloudAI();                           // 静态站回退：读定时任务生成的文件
   }).then(function () {
+    /* 只有真的拿到模型号码才缓存，避免把本地兜底结果当成 AI 结果 */
+    if (AI_STATE.ok) {
+      try { localStorage.setItem(key, JSON.stringify({ nums: RESULTS.ailearn.next, model: AI_STATE.model })); } catch (e) {}
+    }
     renderTabs(cur);
     /* 大模型不可用时该 Tab 已被隐藏，若正停在它上面就切回本地自学习 */
     if (cur === 'ailearn' && !AI_STATE.ok) { show('learn'); return; }
     if (cur === 'ailearn') renderDetail('ailearn');   // 正停在该页时立即刷新显示
+  });
+}
+
+/* 记录 AI 结果并写状态条文案 */
+function useAI(nums, model, how) {
+  AI_STATE = {
+    ok: true, model: model || '',
+    msg: 'AI 已接入（' + (model || '大模型') + '｜' + how + '）：下面 10 个号由大模型结合各算法命中率给出'
+  };
+  RESULTS.ailearn.next = nums.slice(0, 10);
+}
+
+/* 静态站回退：读 GitHub Actions 定时生成的 ai_learn.json（期号对不上视为过期） */
+function loadCloudAI() {
+  var nextIssue = String(parseInt(ROWS[ROWS.length - 1].code, 10) + 1);
+  return fetch('ai_learn.json?t=' + Date.now()).then(function (r) {
+    if (!r.ok) throw new Error('没有 ai_learn.json');
+    return r.json();
+  }).then(function (d) {
+    if (!d || !d.nums || d.nums.length < 10) throw new Error('文件里没有号码');
+    if (d.issue && d.issue !== nextIssue) throw new Error('云端结果是第 ' + d.issue + ' 期，已过期');
+    useAI(d.nums, d.model, '云端定时生成 ' + (d.generated_at || ''));
+  }).catch(function (err) {
+    AI_STATE = {
+      ok: false, model: '',
+      msg: '大模型未接入：' + err.message + '；当前显示本地自学习结果（权重口径相同）'
+    };
   });
 }
 

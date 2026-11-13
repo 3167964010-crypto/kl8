@@ -33,11 +33,20 @@ jobs:
           KL8_LLM_MODEL: ${{ secrets.KL8_LLM_MODEL }}
         run: python build_snapshot.py
 
+      # AI 自学习：把最近 50 期开奖 + 各算法命中率交给大模型，生成下一期 10 个号
+      # 需在 Secrets 配好 KL8_LLM_*，否则脚本只打印“跳过”，不影响任务
+      - name: 生成 AI 自学习号码
+        env:
+          KL8_LLM_URL: ${{ secrets.KL8_LLM_URL }}
+          KL8_LLM_KEY: ${{ secrets.KL8_LLM_KEY }}
+          KL8_LLM_MODEL: ${{ secrets.KL8_LLM_MODEL }}
+        run: python build_ai_learn.py
+
       - name: 提交更新
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add snapshot.json algos_snapshot.json kl8_snapshot.json predictions.json algo_predictions.json history_backtest.json
+          git add snapshot.json algos_snapshot.json kl8_snapshot.json predictions.json algo_predictions.json history_backtest.json ai_learn.json
           if git diff --cached --quiet; then
             echo "数据无变化，跳过提交"
           else
