@@ -8,7 +8,12 @@ on:
     - cron: '*/10 13-15 * * *'
     # 次日早上补一次（00:20 UTC = 08:20 北京）：官方若当天很晚才公布，靠这次补上
     - cron: '20 0 * * *'
-  workflow_dispatch: {}   # 支持手动触发
+  workflow_dispatch:      # 支持手动触发
+    inputs:
+      force_ai:
+        description: '强制重新生成 AI 自学习号码（跳过同期限流）'
+        type: boolean
+        default: false
 
 jobs:
   snapshot:
@@ -40,6 +45,8 @@ jobs:
           KL8_LLM_URL: ${{ secrets.KL8_LLM_URL }}
           KL8_LLM_KEY: ${{ secrets.KL8_LLM_KEY }}
           KL8_LLM_MODEL: ${{ secrets.KL8_LLM_MODEL }}
+          # 手动触发时勾选 force_ai 才会绕过“同一期只生成一次”的限流
+          KL8_AI_FORCE: ${{ inputs.force_ai && '1' || '' }}
         run: python build_ai_learn.py
 
       - name: 提交更新
