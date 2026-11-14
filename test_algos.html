@@ -288,9 +288,9 @@ var ALGOS = [
       var high = last.filter(function (v) { return v > 40; })
                      .sort(function (a, b) { return (c[b] - c[a]) || (a - b); });
       var out = [];
-      while (out.length < 10 && (low.length || high.length)) {
+      while (out.length < POOL && (low.length || high.length)) {
         if (low.length) out.push(low.shift());
-        if (high.length && out.length < 10) out.push(high.shift());
+        if (high.length && out.length < POOL) out.push(high.shift());
       }
       return out;
     }
@@ -379,7 +379,7 @@ var ALGOS = [
       }
       function randomCombo() {
         var set = {}, out = [];
-        while (out.length < 10) {
+        while (out.length < POOL) {
           var v = 1 + Math.floor(R() * 80);
           if (!set[v]) { set[v] = 1; out.push(v); }
         }
@@ -394,13 +394,13 @@ var ALGOS = [
           var p1 = keep[Math.floor(R() * keep.length)];
           var p2 = keep[Math.floor(R() * keep.length)];
           var mix = {}, child = [];
-          for (var j = 0; j < 10; j++) mix[R() < 0.5 ? p1[j] : p2[j]] = 1;   // 交叉
-          for (var v = 1; v <= 80 && child.length < 10; v++) if (mix[v]) child.push(v);
-          while (child.length < 10) {                   // 补齐到 10 个不同号码
+          for (var j = 0; j < POOL; j++) mix[R() < 0.5 ? p1[j] : p2[j]] = 1;   // 交叉
+          for (var v = 1; v <= 80 && child.length < POOL; v++) if (mix[v]) child.push(v);
+          while (child.length < POOL) {                 // 补齐到 20 个不同号码（够两注）
             var nv = 1 + Math.floor(R() * 80);
             if (child.indexOf(nv) < 0) child.push(nv);
           }
-          if (R() < 0.35) child[Math.floor(R() * 10)] = 1 + Math.floor(R() * 80);  // 变异
+          if (R() < 0.35) child[Math.floor(R() * POOL)] = 1 + Math.floor(R() * 80);  // 变异
           pop.push(child);
         }
       }
@@ -462,7 +462,7 @@ var ALGOS = [
     rank: function (rows) {
       var R = rnd(parseInt(rows[rows.length - 1].code, 10) || 1);
       var set = {}, out = [];
-      while (out.length < 10) {
+      while (out.length < POOL) {
         var v = 1 + Math.floor(R() * 80);
         if (!set[v]) { set[v] = 1; out.push(v); }
       }
