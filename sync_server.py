@@ -308,15 +308,16 @@ def prize_amount(n, k):
 
 def play_bets(ranked, n, count=None):
     """
-    为某玩法生成 count 注号码：每注取 n 个连续名次，相邻注错开一位。
-    这样 5 注覆盖的名次范围更宽，且不会出现完全相同的注。
+    为某玩法生成 count 注号码：按名次分段，每注取 n 个连续名次，注与注之间互不重叠。
+    例如选五 2 注 = 第 1~5 名一组、第 6~10 名一组，避免两注号码高度重复。
     """
     if not count:
         count = BETS_PER_PLAY
     pool = list(ranked)
-    if len(pool) < n + count - 1:          # 排序号码不足时用全号池补齐
+    need = n * count
+    if len(pool) < need:                   # 排序号码不足时用全号池补齐
         pool += [x for x in range(1, 81) if x not in pool]
-    return [pool[i:i + n] for i in range(count)]
+    return [pool[i * n:(i + 1) * n] for i in range(count)]
 
 
 def algo_order(rows, aid, stat, picks10):
