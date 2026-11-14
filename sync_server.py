@@ -912,8 +912,8 @@ def consensus_history(st, box):
 
 def overlap_votes(st, issue):
     """
-    统计某一期"前八套算法十种玩法全部注（每玩法 5 注）"里每个号码的出现次数：
-    某号码在八套算法共 400 注里出现了几次，就记几票（出现次数越高越靠前）。
+    统计某一期"前八套算法十种玩法全部注（每玩法 2 注）"里每个号码的出现次数：
+    某号码在八套算法共 160 注里出现了几次，就记几票（出现次数越高越靠前）。
     只取算法清单前八套，跳过"高频重合"自身，避免自我放大。
     """
     votes = {}
@@ -944,7 +944,7 @@ def overlap_history(st, box):
         if aid == OVERLAP_ID:
             continue
         for rec in (st["algos"].get(aid) or {}).get("history", []):
-            # 要求该期已有"每玩法 5 注"的记录，否则无法统计号码出现次数
+            # 要求该期已有"每玩法 2 注"的记录，否则无法统计号码出现次数
             if rec.get("picks10") and rec.get("bets"):
                 issues.add(rec["target"])
     added = False
@@ -980,7 +980,7 @@ def settle_algos(rows):
     next_issue = str(int(rows[-1]["code"]) + 1)
     st = load_json(ALGO_FILE, {"algos": {}})
     changed = False
-    # 配置升级（每玩法 5 注 / 高频重合改为统计八套算法的全部投注号码）：旧的汇总结果作废，按新规则重算
+    # 配置升级（每玩法 2 注 / 高频重合改为统计八套算法的全部投注号码）：旧的汇总结果作废，按新规则重算
     if st.get("cfg_version") != CFG_VERSION:
         st["algos"].pop(OVERLAP_ID, None)
         st["cfg_version"] = CFG_VERSION
@@ -992,7 +992,7 @@ def settle_algos(rows):
         # 重复号码：先用其余算法的往期推荐回填历史记录（随后由第 1 步统一结算）
         if aid == CONSENSUS_ID and consensus_history(st, box):
             changed = True
-        # 高频重合：用其余算法"每玩法 5 注"的往期记录重新计票回填
+        # 高频重合：用其余算法"每玩法 2 注"的往期记录重新计票回填
         if aid == OVERLAP_ID and overlap_history(st, box):
             changed = True
         # 第 1 步：结算该套算法已到期的预测
