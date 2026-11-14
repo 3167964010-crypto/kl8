@@ -111,7 +111,7 @@
 <body>
 <div class="page">
   <div class="topbar">
-    <div class="title"><small>TEST ALGORITHMS · V2</small>测试算法 · 每玩法 2 注</div>
+    <div class="title"><small>TEST ALGORITHMS</small>测试算法 · 每玩法 1 注</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <a class="navlink" href="index.html">← 预测台</a>
       <a class="navlink" href="algos.html">算法对比</a>
@@ -129,8 +129,8 @@
 
   <div class="note">
     <h4>关于本页</h4>
-    本页把《彩票算法总览》里每种逻辑各实现一套（共 18 套），<b>每种玩法出 2 注</b>
-    （每期先出 20 个号的号池，第 1 注取前 n 个、第 2 注取紧随其后的 n 个），与正式页的 5 注错开口径独立；
+    本页把《彩票算法总览》里每种逻辑各实现一套（共 18 套），<b>每种玩法只出 1 注</b>
+    （每期先出 10 个号的号池，各玩法取号池前 n 个），与正式页每玩法 2 注的口径独立；
     回测近 300 期，算法 Tab 按命中率从低到高排列，并标出当前连中 / 连续未中期数。
     另外加了一套「自学习」元算法：按其它 18 套近 20 期的命中率自动分配权重、加权投票出号。
     全部计算在浏览器本地完成，不改动现有算法数据；<b>整体撤回只需删除本文件</b>。
@@ -145,7 +145,7 @@ var ROWS = [];          // 开奖记录（按期号升序）：[{code,date,nums:
 var BACK = 300;         // 回测期数（近 300 期逐期预测并结算）
 var MINHIST = 20;       // 每期预测至少需要的历史期数
 var LEARN_W = 20;       // 自学习算法回看的期数（用这段时间各算法的命中率定权重）
-var POOL = 20;          // 每期候选号池：每玩法 2 注，第 1 注取前 n 个，第 2 注取第 n+1~2n 个
+var POOL = 10;          // 每期候选号池：每玩法只出 1 注，取号池前 n 个
 var RESULTS = {};       // 各算法回测结果缓存
 var cur = null;         // 当前选中的算法 id（AI 结果返回后用于刷新）
 
@@ -275,7 +275,7 @@ var ALGOS = [
       var last = rows[rows.length - 1].nums.slice();
       var c = freq(rows.slice(0, -1));                  // 用历史频率给上期号码重新排序
       last.sort(function (a, b) { return (c[b] - c[a]) || (a - b); });
-      return last.slice(0, POOL);   // 上期 20 个号重排后全部进号池，够出两注
+      return last.slice(0, POOL);   // 上期号码重排后取前 10 个进号池
     }
   },
   {
@@ -396,7 +396,7 @@ var ALGOS = [
           var mix = {}, child = [];
           for (var j = 0; j < POOL; j++) mix[R() < 0.5 ? p1[j] : p2[j]] = 1;   // 交叉
           for (var v = 1; v <= 80 && child.length < POOL; v++) if (mix[v]) child.push(v);
-          while (child.length < POOL) {                 // 补齐到 20 个不同号码（够两注）
+          while (child.length < POOL) {                 // 补齐到 10 个不同号码
             var nv = 1 + Math.floor(R() * 80);
             if (child.indexOf(nv) < 0) child.push(nv);
           }
@@ -544,7 +544,7 @@ var ALGOS = [
     /* 自学习：不改动上面 18 套的固定逻辑，而是每期动态给它们分配权重 */
     id: 'learn', name: '自学习（按命中率加权）', learn: true, src: '本页新增 · 元算法',
     logic: '每期预测前先回看近 ' + LEARN_W + ' 期，统计其它 18 套算法推荐 10 号的实际命中个数，' +
-           '命中率越高权重越大（权重 = 命中率²），再用它们最新一期的推荐按权重投票，票数最高的 20 个号作为本期号池（每玩法前后两段各出 1 注）。',
+           '命中率越高权重越大（权重 = 命中率²），再用它们最新一期的推荐按权重投票，票数最高的 10 个号作为本期号池（每玩法 1 注）。',
     rank: function (rows) { return topN(freq(rows), POOL); }   // 兜底实现，实际走 learnPicks()
   },
   {
@@ -591,7 +591,7 @@ function learnWeights(i) {
   return out;
 }
 
-/* 自学习选号：各算法最新一期推荐按「命中率²」加权投票，取票数最高的 20 个号（够每玩法两注） */
+/* 自学习选号：各算法最新一期推荐按「命中率²」加权投票，取票数最高的 10 个号 */
 function learnPicks(i) {
   var ws = learnWeights(i);
   var lastIdx = i >= ROWS.length ? ROWS.length - 1 : i - 1;   // 用最近一期可用的推荐
@@ -615,32 +615,34 @@ function picksFor(a, i) {
   return BASE[i][a.id];
 }
 
-/* 对某套算法做近 BACK 期回测：每期用之前的历史预测，每玩法买 2 注（号池前后两段，互不重叠） */
+/* 对某套算法做近 BACK 期回测：每期用之前的历史预测，每玩法只买 1 注 */
 function backtest(a) {
   var stat = { plays: {}, win: 0, total: 0, rows: [] };
   for (var n = 1; n <= 10; n++) stat.plays[n] = { win: 0, total: 0, amt: 0 };
   var start = Math.max(MINHIST, ROWS.length - BACK);   // 至少留 MINHIST 期历史再开始回测
   for (var i = start; i < ROWS.length; i++) {
     var target = ROWS[i];
-    var pool = picksFor(a, i);                          // 20 个候选号
+    var pool = picksFor(a, i);                          // 10 个候选号
     var drawn = target.nums, bets = {}, winCnt = 0, amt = 0;
     for (var n2 = 1; n2 <= 10; n2++) {
-      /* 第 1 注 = 号池前 n 个；第 2 注 = 紧随其后的 n 个 */
-      bets[n2] = [pool.slice(0, n2), pool.slice(n2, n2 * 2)].map(function (bet) {
-        var k = bet.filter(function (v) { return drawn.indexOf(v) >= 0; }).length;
-        return { bet: bet, k: k, amt: PRIZE[n2][k] || 0 };
-      });
+      /* 每玩法 1 注 = 号池前 n 个 */
+      bets[n2] = [{
+        bet: pool.slice(0, n2),
+        k: pool.slice(0, n2).filter(function (v) { return drawn.indexOf(v) >= 0; }).length,
+        amt: 0
+      }];
+      bets[n2][0].amt = PRIZE[n2][bets[n2][0].k] || 0;
       bets[n2].forEach(function (b) {
         stat.plays[n2].total++;
         if (b.amt > 0) { stat.plays[n2].win++; stat.plays[n2].amt += b.amt; winCnt++; amt += b.amt; }
       });
     }
-    stat.total += 20;                                   // 十种玩法 × 每玩法 2 注
+    stat.total += 10;                                   // 十种玩法 × 每玩法 1 注
     stat.win += winCnt;
     stat.rows.push({ code: target.code, date: target.date, rank: pool, drawn: drawn,
                      bets: bets, winCnt: winCnt, amt: amt });
   }
-  stat.next = picksFor(a, ROWS.length);                // 下一期号池（每玩法 2 注）
+  stat.next = picksFor(a, ROWS.length);                // 下一期号池（每玩法 1 注）
 
   /* 连中期数 / 连续未中期数：以「该期是否有任意一注中奖」为准，从最近一期往前数 */
   var cw = 0, cl = 0;
@@ -732,25 +734,23 @@ function renderDetail(id) {
       '<div class="legend">权重 = 命中率的平方；命中率越高，它推荐的号码在投票中占的分量越大。</div>';
   }
 
-  /* 下一期预测：20 个号池 + 十玩法各 2 注（第 1 注取前 n 个，第 2 注取紧随其后的 n 个） */
+  /* 下一期预测：10 个号池 + 十玩法各 1 注（取号池前 n 个） */
   var mini = function (arr) {
     return arr.map(function (v) { return '<span class="mini pred">' + pad(v) + '</span>'; }).join('');
   };
-  html += '<h3 style="margin-top:16px">第 ' + nextIssue + ' 期预测（每玩法 2 注，共 ' + POOL + ' 个号）</h3>' +
+  html += '<h3 style="margin-top:16px">第 ' + nextIssue + ' 期预测（每玩法 1 注，共 ' + POOL + ' 个号）</h3>' +
     ballsHTML(st.next, null, 'pred');
   var rowsHTML = '';
   for (var n = 1; n <= 10; n++) {
-    var b1 = st.next.slice(0, n), b2 = st.next.slice(n, n * 2);
     var pl = st.plays[n];
     var rate = pl.total ? (pl.win / pl.total * 100) : 0;
-    rowsHTML += '<div class="play-row"><span class="play-name">选' + CN[n - 1] + '①</span>' + mini(b1) +
+    rowsHTML += '<div class="play-row"><span class="play-name">选' + CN[n - 1] + '</span>' + mini(st.next.slice(0, n)) +
       '<span class="play-rate">近 ' + st.rows.length + ' 期中 <b>' + pl.win + '</b>/' + pl.total +
-      ' 注 · <b>' + rate.toFixed(1) + '%</b></span></div>' +
-      '<div class="play-row"><span class="play-name">选' + CN[n - 1] + '②</span>' + mini(b2) + '</div>';
+      ' 注 · <b>' + rate.toFixed(1) + '%</b></span></div>';
   }
   html += rowsHTML;
 
-  /* 往期回测表：每期 20 号池、开奖 20 号（命中加深）、逐玩法中奖明细（选几 中几 · 奖金）、合计 */
+  /* 往期回测表：每期 10 号池、开奖 20 号（命中加深）、逐玩法中奖明细（选几 中几 · 奖金）、合计 */
   var trs = st.rows.slice().reverse().map(function (r) {
     var hitSet = {};
     r.rank.forEach(function (v) { hitSet[v] = 1; });
@@ -758,28 +758,28 @@ function renderDetail(id) {
     var draw = r.drawn.map(function (v) {
       return '<span class="mini' + (hitSet[v] ? ' hit' : '') + '">' + pad(v) + '</span>';
     }).join('');
-    /* 逐玩法列出中奖档位，①② 区分同一玩法的两注：如「选五① 中4 · 21元」 */
+    /* 逐玩法列出中奖档位：如「选五 中4 · 21元」 */
     var wins = [];
     for (var n = 1; n <= 10; n++) {
-      (r.bets[n] || []).forEach(function (b, idx) {
+      (r.bets[n] || []).forEach(function (b) {
         if (!b.amt) return;
-        wins.push('选' + CN[n - 1] + (idx ? '②' : '①') + ' 中' + b.k + ' · ' + money(b.amt) + '元' +
+        wins.push('选' + CN[n - 1] + ' 中' + b.k + ' · ' + money(b.amt) + '元' +
           (b.k === 0 ? '（全不中）' : ''));
       });
     }
     var detail = wins.length ? wins.join('<br>') : '未中奖';
     return '<tr><td class="n">' + r.code + '</td><td>' + pred + '</td><td>' + draw + '</td>' +
       '<td class="detail-cell ' + (wins.length ? 'win' : 'lose') + '">' + detail + '</td>' +
-      '<td class="n ' + (r.winCnt ? 'win' : 'lose') + '">' + r.winCnt + '/20 注</td>' +
+      '<td class="n ' + (r.winCnt ? 'win' : 'lose') + '">' + r.winCnt + '/10 注</td>' +
       '<td class="n ' + (r.amt ? 'win' : 'lose') + '">' + money(r.amt) + ' 元</td></tr>';
   }).join('');
   html += '<h3 style="margin-top:16px">往期回测（近 ' + st.rows.length + ' 期）</h3>' +
     '<div class="table-wrap"><table><thead><tr>' +
-    '<th>期号</th><th>号池（20 号）</th><th>开奖号码（金色实心 = 命中）</th>' +
+    '<th>期号</th><th>号池（10 号）</th><th>开奖号码（金色实心 = 命中）</th>' +
     '<th>中奖明细（选几 中几 · 奖金）</th><th>中奖注数</th><th>奖金合计</th>' +
     '</tr></thead><tbody>' + trs + '</tbody></table></div>' +
-    '<div class="legend">开奖号码里金色实心、白字加粗的，就是与本期号池 20 个号码重合的号；其余为淡灰未命中。' +
-    '每玩法 2 注（①取号池前 n 个、②取紧随其后的 n 个）、每注 2 元，共 20 注 / 期；' +
+    '<div class="legend">开奖号码里金色实心、白字加粗的，就是与本期号池 10 个号码重合的号；其余为淡灰未命中。' +
+    '每玩法 1 注（取号池前 n 个）、每注 2 元，共 10 注 / 期；' +
     '「中奖明细」按玩法列出中奖档位与单注奖金，选七~选十全不中返 2 元显示为「中0（全不中）」。</div>';
 
   box.innerHTML = html;
@@ -850,12 +850,12 @@ function askAI() {
 function useAI(nums, model, how, source) {
   AI_STATE = {
     ok: true, source: source || '', model: model || '',
-    msg: 'AI 已接入（' + (model || '大模型') + '｜' + how + '）：前 10 个号由大模型给出，后 10 个由本地自学习补齐，共 ' + POOL + ' 个号'
+    msg: 'AI 已接入（' + (model || '大模型') + '｜' + how + '）：10 个号由大模型结合各算法命中率给出'
   };
-  /* 大模型只给 10 个号：后 10 个用本地自学习的第 11~20 名补齐，保证每玩法仍能出 2 注 */
-  var pool = nums.slice(0, 10);
+  /* 大模型给 10 个号，每玩法取前 n 个，正好出 1 注 */
+  var pool = nums.slice(0, POOL);
   learnPicks(ROWS.length).forEach(function (v) {
-    if (pool.length < POOL && pool.indexOf(v) < 0) pool.push(v);
+    if (pool.length < POOL && pool.indexOf(v) < 0) pool.push(v);   // 不足 10 个时用本地自学习补齐
   });
   RESULTS.ailearn.next = pool;
 }
@@ -915,7 +915,7 @@ function loadData() {
 loadData().then(function (rows) {
   ROWS = rows;
   var info = '已加载 <b>' + rows.length + '</b> 期开奖（' + rows[0].code + ' ~ ' + rows[rows.length - 1].code +
-    '） · 回测 <b>' + Math.min(BACK, rows.length - MINHIST) + '</b> 期 · 每玩法 <b>2</b> 注';
+    '） · 回测 <b>' + Math.min(BACK, rows.length - MINHIST) + '</b> 期 · 每玩法 <b>1</b> 注';
   document.getElementById('status').innerHTML = info + ' · <b>正在计算…</b>';
   /* 几百期数据 × 19 套算法要算一两秒，先让浏览器把提示画出来再开始，避免看起来像卡死 */
   setTimeout(function () {
