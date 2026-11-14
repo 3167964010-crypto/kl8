@@ -25,11 +25,11 @@ def dump(name, obj):
     print("已写入 %s（%d 字节）" % (name, os.path.getsize(path)))
 
 
-def fetch_with_retry(times=3, wait=20, least=30):
+def fetch_with_retry(count=501, times=3, wait=20, least=120):
     """抓取开奖数据，失败或过少时重试；仍失败返回空/少量结果由调用方兜底"""
     rows = []
     for i in range(times):
-        rows = S.fetch_rows(101)
+        rows = S.fetch_rows(count)
         if len(rows) >= least:
             return rows
         print("第 %d 次拉取仅 %d 期，%d 秒后重试 ..." % (i + 1, len(rows), wait))
@@ -41,17 +41,17 @@ def main():
     started = time.time()
     print("开始生成快照 ...")
 
-    # 只抓一次数据，三份快照共用；数据源偶尔超时，这里重试避免整次任务失败
+    # 多抓一些：算法验证页要回测 300 期，需要 500 期历史；其它快照只用最近 100 期
     rows = fetch_with_retry()
-    if len(rows) < 30:
+    if len(rows) < 120:
         # 保留上一次已生成的快照，不让线上数据被清空，同时以成功状态退出避免误报任务失败
         print("拉取失败（%d 期），本次不更新快照，保留上一次结果" % len(rows))
         return
 
-    # 先跑主预测：会完成结算、生成下一期预测，并刷新 100 期对照
-    pred = S.settle_and_predict(rows)
-    # 再跑 9 套算法：复用同一份最新开奖数据
-    algos = S.settle_algos(rows)
+    # 主预测与 9 套算法沿用原有 100 期口径，避免改变正式页结果
+    recent = rows[-101:]
+    pred = S.settle_and_predict(recent)
+    algos = S.settle_algos(recent)
     kl8 = {
         "state": 0,
         "result": [

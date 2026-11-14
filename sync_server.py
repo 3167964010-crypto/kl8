@@ -1342,7 +1342,8 @@ class Handler(SimpleHTTPRequestHandler):
         count = 50
         if "count=" in self.path:
             try:
-                count = max(1, min(200, int(self.path.split("count=")[1].split("&")[0])))
+                # 上限放到 500：算法验证页要回测 300 期，需要更多历史
+                count = max(1, min(500, int(self.path.split("count=")[1].split("&")[0])))
             except Exception:
                 count = 50
         try:
