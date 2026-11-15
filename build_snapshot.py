@@ -37,15 +37,48 @@ def fetch_with_retry(count=501, times=3, wait=20, least=120):
     return rows
 
 
+def latest_issue():
+    """读取仓库里 kl8_snapshot.json 的最新期号，用于判断这一轮是否已经抓到新开奖"""
+    try:
+        with open(os.path.join(BASE, "kl8_snapshot.json"), "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data["result"][-1]["code"]
+    except Exception:
+        return ""
+
+
+def wait_for_new(before, wait_min):
+    """
+    开奖后刚触发任务时，官方数据往往还没发布。
+    在 wait_min 分钟内每 30 秒重抓一次，一旦出现新期号就立刻返回，
+    这样一轮任务就能覆盖整个发布窗口，不用指望下一次 cron（GitHub 定时常有延迟）。
+    """
+    if wait_min <= 0:
+        return fetch_with_retry()
+    deadline = time.time() + wait_min * 60
+    while True:
+        rows = fetch_with_retry(times=2, wait=15)
+        cur = rows[-1]["code"] if rows else ""
+        if len(rows) >= 120 and cur and cur > before:
+            print("已抓到新一期 %s（原 %s），立即生成快照" % (cur, before or "—"))
+            return rows
+        if time.time() >= deadline:
+            print("等待 %d 分钟仍未出现新一期（当前最新 %s）" % (wait_min, cur or "—"))
+            return rows
+        print("尚无新一期（当前最新 %s），30 秒后重试 ..." % (cur or "—"))
+        time.sleep(30)
+
+
 def main():
     started = time.time()
     print("开始生成快照 ...")
 
     # 多抓一些：算法验证页要回测 300 期，需要 500 期历史；其它快照只用最近 100 期
-    rows = fetch_with_retry()
+    wait_min = int(os.environ.get("KL8_WAIT_MIN", "0") or 0)
+    rows = wait_for_new(latest_issue(), wait_min)
     if len(rows) < 120:
-        # 保留上一次已生成的快照，不让线上数据被清空，同时以成功状态退出避免误报任务失败
-        print("拉取失败（%d 期），本次不更新快照，保留上一次结果" % len(rows))
+        # 保留上一次已生成的快照，不让线上数据被清空；同时打警告，避免"全绿但没更新"
+        print("::warning::拉取失败（%d 期），本次不更新快照，保留上一次结果" % len(rows))
         return
 
     # 主预测与 9 套算法沿用原有 100 期口径，避免改变正式页结果

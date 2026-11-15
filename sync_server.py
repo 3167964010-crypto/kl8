@@ -57,7 +57,8 @@ def fetch_draws(count=50):
         "Accept": "application/json, text/javascript, */*; q=0.01",
     })
     ctx = ssl._create_unverified_context()  # 忽略证书链校验，避免本地环境报错
-    with urllib.request.urlopen(req, timeout=30, context=ctx) as resp:
+    # 超时放到 45 秒：GitHub 海外 runner 访问国内站点偏慢，30 秒常被判超时
+    with urllib.request.urlopen(req, timeout=45, context=ctx) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
@@ -87,7 +88,7 @@ def fetch_draws_sina(count=100):
         "Referer": "https://lotto.sina.cn/",
     })
     ctx = ssl._create_unverified_context()
-    with urllib.request.urlopen(req, timeout=30, context=ctx) as resp:
+    with urllib.request.urlopen(req, timeout=45, context=ctx) as resp:
         html = resp.read().decode("utf-8", "ignore")
     rows = []
     # 每期数据形如 <div class="issue"><span class="issue-no">2026291</span>

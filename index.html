@@ -969,7 +969,7 @@ function loadData() {
       return r.json();
     })
     .catch(function () {
-      return fetch('kl8_snapshot.json', { cache: 'no-store' }).then(function (r) {
+      return fetch('kl8_snapshot.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
       });
@@ -1015,7 +1015,7 @@ function loadPredict() {
       return j;
     })
     .catch(function () {
-      return fetch('snapshot.json', { cache: 'no-store' }).then(function (r) { return r.json(); });
+      return fetch('snapshot.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); });
     })
     .then(renderPredict)
     .catch(function () {

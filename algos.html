@@ -323,7 +323,7 @@ function loadAlgos() {
       return r.json();
     })
     .catch(function () {
-      return fetch('algos_snapshot.json', { cache: 'no-store' }).then(function (r) { return r.json(); });
+      return fetch('algos_snapshot.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); });
     })
     .then(function (d) {
       if (d.state !== 0) { throw new Error(d.message || '接口异常'); }

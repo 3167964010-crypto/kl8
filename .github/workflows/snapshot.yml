@@ -3,11 +3,15 @@ name: 更新快乐8数据快照
 
 on:
   schedule:
-    # 开奖日（每天 21:30 北京）之后的窗口内每 10 分钟检查一次：
-    # GitHub 用 UTC，13:00-15:50 UTC = 北京时间 21:00-23:50，避免"只跑两次"错过官方数据更新
-    - cron: '*/10 13-15 * * *'
+    # 开奖后 30 分钟内必须出现在线上：北京 21:00-22:55 每 5 分钟触发一次（UTC 13:00-14:55）
+    # 脚本自身还会在窗口内轮询等待新一期，所以只要有一轮触发成功，就能在抓到时立刻提交
+    - cron: '*/5 13-14 * * *'
+    # 北京 23:00-23:50 每 10 分钟兜底（UTC 15:00-15:50）
+    - cron: '*/10 15 * * *'
     # 次日早上补一次（00:20 UTC = 08:20 北京）：官方若当天很晚才公布，靠这次补上
     - cron: '20 0 * * *'
+    # 中午再补一次（04:00 UTC = 12:00 北京）：防止海外网络整晚抽风导致一整天没数据
+    - cron: '0 4 * * *'
   workflow_dispatch:      # 支持手动触发
     inputs:
       force_ai:
@@ -15,9 +19,15 @@ on:
         type: boolean
         default: false
 
+# 同一时间只允许一个快照任务在跑，避免多轮触发互相抢 git 提交
+concurrency:
+  group: kl8-snapshot
+  cancel-in-progress: false
+
 jobs:
   snapshot:
     runs-on: ubuntu-latest
+    timeout-minutes: 30       # 含等待新一期的轮询时间，超时自动结束避免卡死
     permissions:
       contents: write       # 允许把生成结果提交回仓库
     steps:
@@ -36,6 +46,8 @@ jobs:
           KL8_LLM_URL: ${{ secrets.KL8_LLM_URL }}
           KL8_LLM_KEY: ${{ secrets.KL8_LLM_KEY }}
           KL8_LLM_MODEL: ${{ secrets.KL8_LLM_MODEL }}
+          # 还没有新一期时最多原地等待 10 分钟（每 30 秒重抓），抓到就立刻生成并提交
+          KL8_WAIT_MIN: '10'
         run: python build_snapshot.py
 
       # AI 自学习：把最近 50 期开奖 + 各算法命中率交给大模型，生成下一期 10 个号
