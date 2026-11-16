@@ -1240,8 +1240,16 @@ window.addEventListener('focus', loadData);   // 切回页面立即同步一次
 
 // 注册离线缓存：添加到主屏幕后，断网也能查看上次同步的数据
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-  navigator.serviceWorker.register('sw.js').catch(function () { /* 注册失败不影响页面 */ });
+  // updateViaCache:'none' 让浏览器每次都拿最新的 sw.js，不受 HTTP 缓存影响
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+    .then(function (reg) {
+      // 主动检查一次更新，新版本 SW 会在后台接管，页面随后自动刷成最新
+      if (reg.update) reg.update().catch(function () {});
+    })
+    .catch(function () { /* 注册失败不影响页面 */ });
 }
 </script>
+<!-- 页面版本标识：用于快速判断浏览器拿到的是新版还是缓存旧版 -->
+<div style="text-align:center;font-size:11px;color:#a89e90;margin-top:18px;letter-spacing:.04em;">页面版本 v7 · 每种玩法 1 注</div>
 </body>
 </html>

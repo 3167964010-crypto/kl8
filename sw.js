@@ -1,7 +1,8 @@
-// 离线缓存：在线时网络优先（保证数据最新），断网时回退到最后一次缓存
-// 这样手机断网仍能打开页面并查看上次同步的开奖与预测
+// 离线缓存：在线时强制走网络（绕过 HTTP 缓存），断网时回退到最后一次缓存
+// 这样手机断网仍能打开页面，在线时一定拿到最新版本与最新开奖
 
-const CACHE = 'kl8-cache-v1';
+// 缓存版本：改动页面或数据口径时递增，旧的缓存会在 activate 时被清掉
+const CACHE = 'kl8-cache-v2';
 
 // 首次安装时预缓存核心页面与数据快照
 const CORE = [
@@ -9,6 +10,7 @@ const CORE = [
   './index.html',
   './algos.html',
   './prize.html',
+  './test_algos.html',
   './snapshot.json',
   './algos_snapshot.json',
   './kl8_snapshot.json',
@@ -39,8 +41,13 @@ self.addEventListener('fetch', (event) => {
   // 本地接口不缓存，直接走网络
   if (req.url.indexOf('/api/') >= 0) return;
 
+  // 关键：cache: 'no-store' 强制跳过浏览器 HTTP 缓存。
+  // 否则 GitHub Pages 给 HTML/JSON 的 max-age=600 会让 Service Worker
+  // 每次"联网"都拿到 10 分钟前的旧页面，用户刷新也看不到更新。
+  const fresh = new Request(req, { cache: 'no-store' });
+
   event.respondWith(
-    fetch(req)
+    fetch(fresh)
       .then((res) => {
         // 网络成功则更新缓存，保证下次断网看到的是最新数据
         const copy = res.clone();
