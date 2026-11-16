@@ -15,6 +15,7 @@ import time
 import webbrowser
 import urllib.request
 import urllib.error
+from datetime import datetime, timedelta
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
 # 官方开奖查询接口
@@ -380,6 +381,24 @@ def algo_order(rows, aid, stat, picks10):
     return order
 
 
+def next_draw_time(rows):
+    """
+    计算下一期的计划开奖时间：快乐8 每天一期、21:30 开奖。
+    以最近一期开奖日期为基准，若当天 21:30 已过则顺延一天，
+    避免把「刚开完的那一期」误当成下一期。
+    """
+    if not rows:
+        return ""
+    try:
+        last = datetime.strptime(rows[-1]["date"][:10], "%Y-%m-%d")
+        target = last.replace(hour=21, minute=30, second=0, microsecond=0)
+        if target <= datetime.now():
+            target += timedelta(days=1)
+        return target.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return ""
+
+
 def backtest10(rows, window=30):
     """
     十种玩法滚动回测：对最近 window 期逐期模拟（只用该期之前的数据打分取排序），
@@ -658,7 +677,7 @@ def settle_and_predict(rows=None):
         "rate": round(hits / len(settled) * 100, 2) if settled else None,
         "backtest10": backtest10(model_rows),         # 十种玩法回测与理论中奖概率
         "records": build_history(rows, 100),          # 最近 100 期：预测号码 + 实际开奖 + 命中
-        "next_draw_time": (rows[-1]["date"] + " 21:30:00") if rows else "",  # 最近一期开奖时间
+        "next_draw_time": next_draw_time(rows),       # 下一期计划开奖时间（每天一期，21:30）
     }
 
 
