@@ -31,6 +31,12 @@ self.addEventListener('activate', (event) => {
     caches.keys()
       .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
+      // 新版本接管后，把所有已打开的页面强制刷新一次，
+      // 避免用户还盯着旧页面看（旧页面的 JS 与文案不会自己变）
+      .then(() => self.clients.matchAll({ type: 'window' }))
+      .then((clients) => clients.forEach((c) => {
+        if (c.navigate) c.navigate(c.url).catch(() => {});
+      }))
   );
 });
 
