@@ -729,20 +729,22 @@ ALGOS = [
     ("prev", "上期规律", "以上一期号码为基准：重号 4 个 + 邻号 3 个 + 同尾号 3 个，跟随最近一期结构"),
     ("random", "随机对照", "以期号为种子的固定随机序列，作为基准线"),
     ("consensus", "重复号码", "统计以上各套算法同一期共同推荐的号码，按被推荐次数（票数）排序"),
-    ("overlap", "高频重合", "统计前八套算法十种玩法全部注（每玩法 2 注）中号码的出现次数，按出现次数从高到低排序"),
+    ("overlap", "高频重合", "统计前八套算法十种玩法全部注（每玩法 1 注）中号码的出现次数，按出现次数从高到低排序"),
 ]
 
 CONSENSUS_ID = "consensus"      # 重复号码算法的 id，需要特殊处理（汇总其他算法）
 OVERLAP_ID = "overlap"          # 高频重合算法的 id，依赖前八套算法的全部投注号码
-BETS_PER_PLAY = 2               # 每种玩法预测的注数（选一~选十各 2 注）
-CFG_VERSION = "v4-2bets"        # 算法配置版本：升级时清空受影响的缓存结果并按新规则重算
+BETS_PER_PLAY = 2               # 预测台（index.html）每种玩法预测的注数（选一~选十各 2 注）
+ALGO_BETS_PER_PLAY = 1          # 算法对比页（algos.html）每种玩法的注数，与预测台独立
+CFG_VERSION = "v5-algo1bet"     # 算法配置版本：升级时清空受影响的缓存结果并按新规则重算
 
 
-def bets_need_rebuild(bets):
-    """每玩法注数配置变化后，旧记录（曾为 10 注）需要按新注数重建"""
+def bets_need_rebuild(bets, count=None):
+    """每玩法注数配置变化后，旧记录（曾为 10 注 / 2 注）需要按新注数重建"""
     if not bets:
         return True
-    return any(len(bets.get(str(n)) or []) != BETS_PER_PLAY for n in range(1, 11))
+    count = count or BETS_PER_PLAY
+    return any(len(bets.get(str(n)) or []) != count for n in range(1, 11))
 
 
 def load_json(path, default):
@@ -954,8 +956,8 @@ def consensus_history(st, box):
 
 def overlap_votes(st, issue):
     """
-    统计某一期"前八套算法十种玩法全部注（每玩法 2 注）"里每个号码的出现次数：
-    某号码在八套算法共 160 注里出现了几次，就记几票（出现次数越高越靠前）。
+    统计某一期"前八套算法十种玩法全部注（每玩法 1 注）"里每个号码的出现次数：
+    某号码在八套算法共 80 注里出现了几次，就记几票（出现次数越高越靠前）。
     只取算法清单前八套，跳过"高频重合"自身，避免自我放大。
     """
     votes = {}
@@ -986,7 +988,7 @@ def overlap_history(st, box):
         if aid == OVERLAP_ID:
             continue
         for rec in (st["algos"].get(aid) or {}).get("history", []):
-            # 要求该期已有"每玩法 2 注"的记录，否则无法统计号码出现次数
+            # 要求该期已有"每玩法 1 注"的记录，否则无法统计号码出现次数
             if rec.get("picks10") and rec.get("bets"):
                 issues.add(rec["target"])
     added = False
@@ -1022,7 +1024,7 @@ def settle_algos(rows):
     next_issue = str(int(rows[-1]["code"]) + 1)
     st = load_json(ALGO_FILE, {"algos": {}})
     changed = False
-    # 配置升级（每玩法 2 注 / 高频重合改为统计八套算法的全部投注号码）：旧的汇总结果作废，按新规则重算
+    # 配置升级（算法对比页改为每玩法 1 注）：旧的汇总结果作废，按新规则重算
     if st.get("cfg_version") != CFG_VERSION:
         st["algos"].pop(OVERLAP_ID, None)
         st["cfg_version"] = CFG_VERSION
@@ -1034,7 +1036,7 @@ def settle_algos(rows):
         # 重复号码：先用其余算法的往期推荐回填历史记录（随后由第 1 步统一结算）
         if aid == CONSENSUS_ID and consensus_history(st, box):
             changed = True
-        # 高频重合：用其余算法"每玩法 2 注"的往期记录重新计票回填
+        # 高频重合：用其余算法"每玩法 1 注"的往期记录重新计票回填
         if aid == OVERLAP_ID and overlap_history(st, box):
             changed = True
         # 第 1 步：结算该套算法已到期的预测
@@ -1044,14 +1046,15 @@ def settle_algos(rows):
                 if "actual" not in rec:
                     rec["actual"] = sorted(actual)      # 记录实际开奖号码，供前端对照展示
                     changed = True
-                # 每玩法 10 注：只用以该期之前的数据重算排序再滑窗取号，
+                # 每玩法 1 注：只用以该期之前的数据重算排序再取号，
                 # 方便开奖后在本期记录上展示每个玩法的中奖号码
-                if bets_need_rebuild(rec.get("bets")):
+                if bets_need_rebuild(rec.get("bets"), ALGO_BETS_PER_PLAY):
                     before = rows[:pos.get(rec["target"], len(rows))]
                     if len(before) < 20:
                         before = rows[:20]
                     order = algo_order(before, aid, algo_stats(before), rec["picks10"])
-                    rec["bets"] = {str(n): play_bets(order, n) for n in range(1, 11)}
+                    rec["bets"] = {str(n): play_bets(order, n, ALGO_BETS_PER_PLAY)
+                                   for n in range(1, 11)}
                     changed = True
                 if not rec.get("settled"):
                     rec["settled"] = True
@@ -1125,14 +1128,14 @@ def settle_algos(rows):
                    "created": time.strftime("%Y-%m-%d %H:%M:%S")}
             box["history"].append(cur)
             changed = True
-        # 当前预测也要有"每玩法 10 注"：前 10 用本算法推荐，其余号码按同算法评分补齐
-        if cur is not None and bets_need_rebuild(cur.get("bets")):
+        # 当前预测也要有"每玩法 1 注"：按本算法完整排序滑窗取号
+        if cur is not None and bets_need_rebuild(cur.get("bets"), ALGO_BETS_PER_PLAY):
             order = algo_order(rows, aid, algo_stats(rows), cur.get("picks10") or [])
-            cur["bets"] = {str(n): play_bets(order, n) for n in range(1, 11)}
+            cur["bets"] = {str(n): play_bets(order, n, ALGO_BETS_PER_PLAY) for n in range(1, 11)}
             changed = True
         settled = [r for r in box["history"] if r.get("settled")]
         hits = sum(1 for r in settled if r.get("hit"))
-        # 各玩法 10 注的注级命中率：命中注数 / 总注数（按已结算期统计）
+        # 各玩法 1 注的注级命中率：命中注数 / 总注数（按已结算期统计）
         play_rates = {}
         for n in range(1, 11):
             win = cnt = 0
