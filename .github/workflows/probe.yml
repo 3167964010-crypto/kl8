@@ -1,0 +1,28 @@
+# 临时探针任务（非交付）：在海外 runner 上测试各数据源是否可达，测完即可删除
+name: 探测数据源可达性
+
+on:
+  push:
+    paths:
+      - 'probe_sources.py'
+  workflow_dispatch: {}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: 逐个测试数据源
+        run: python probe_sources.py
+      - name: 提交结果
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add probe_result.txt
+          git commit -m "chore: 数据源探针结果" || echo "无变化"
+          git push
