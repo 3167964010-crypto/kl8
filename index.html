@@ -312,7 +312,7 @@
   /* 轻提示：暖白卡片，不再弹出黑块 */
   .toast{background:rgba(250,247,241,.98);color:var(--ink);border-color:rgba(154,106,26,.32);
          box-shadow:0 8px 24px rgba(90,76,58,.16);}
-  /* === 十玩法 2 注展示：每注一行，号码等宽对齐 === */
+  /* === 十玩法投注展示：每注一行，号码等宽对齐 === */
   .ten-count{font-size:10.5px;color:var(--muted);font-weight:400;margin-left:4px;}
   .bet-list{margin:6px 0;}
   /* 每张卡先标明预测期号，与下方"上一期结果"区分 */
@@ -324,7 +324,7 @@
   .bet-num{display:inline-block;min-width:21px;font-variant-numeric:tabular-nums;color:var(--ink);}
   /* 中奖档位一行小字：中9 0 注 · 中8 1 注 … */
   .tier-line{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.6;}
-  /* 每格需放下 2 注，桌面端自动两列左右，手机单列 */
+  /* 每格放十种玩法各 1 注，桌面端自动两列左右，手机单列 */
   .ten-grid{grid-template-columns:repeat(auto-fill,minmax(290px,1fr));}
   @media (max-width:640px){.ten-grid{grid-template-columns:1fr;}.bet-row{font-size:11px;}}
   ::-webkit-scrollbar-thumb{background:rgba(109,90,156,.28);}
@@ -565,12 +565,10 @@ function scoreNumbers(rows) {
   return list;
 }
 
-// 生成参考号码：选一 2 注、选四、选十
+// 生成参考号码：选一 1 注、选四、选十
 function buildPicks(rows) {
   var sc = scoreNumbers(rows);
-  var missOne = sc.slice().sort(function (a, b) { return b.miss - a.miss; })[0].num;
-  var one = [sc[0].num];
-  if (missOne !== sc[0].num) one.push(missOne); else one.push(sc[1].num);
+  var one = [sc[0].num];          // 选一只出 1 注，取综合评分第 1 的号码
   return {
     one: one,
     four: sc.slice(0, 4).map(function (x) { return x.num; }),
@@ -725,8 +723,8 @@ function renderBacktest() {
 
   // 一、三玩法概览（实际 vs 理论）
   var rows = [
-    { name: '选一 · 2 注', avg: avg(res.one), base: '0.50',
-      hit: pct(res.one, function (v) { return v >= 1; }), hitBase: '43.99', unit: '至少中 1 个' },
+    { name: '选一 · 1 注', avg: avg(res.one), base: '0.25',
+      hit: pct(res.one, function (v) { return v >= 1; }), hitBase: '25.00', unit: '命中该号' },
     { name: '选四 · 1 注', avg: avg(res.four), base: '1.00',
       hit: pct(res.four, function (v) { return v >= 2; }), hitBase: '25.89', unit: '中 ≥ 2 个' },
     { name: '选十 · 1 注', avg: avg(res.ten), base: '2.50',
@@ -739,10 +737,10 @@ function renderBacktest() {
   }).join('');
 
   // 二、命中分布汇总（只统计命中个数，不含奖金）
-  var d1 = dist(res.one, 2), d4 = dist(res.four, 4);
+  var d1 = dist(res.one, 1), d4 = dist(res.four, 4);
   var sumRows = [
-    { name: '选一 · 2 注',
-      dist: '中 0 个 ' + d1[0] + ' 期 · 中 1 个 ' + d1[1] + ' 期 · 中 2 个 ' + d1[2] + ' 期' },
+    { name: '选一 · 1 注',
+      dist: '中 0 个 ' + d1[0] + ' 期 · 中 1 个 ' + d1[1] + ' 期' },
     { name: '选四 · 1 注',
       dist: '中 0: ' + d4[0] + ' · 中 1: ' + d4[1] + ' · 中 2: ' + d4[2] + ' · 中 3: ' + d4[3] + ' · 中 4: ' + d4[4] + '（期）' },
     { name: '选十 · 1 注',
@@ -1075,7 +1073,7 @@ function renderPredict(p) {
   el.innerHTML =
     '<div class="ai-cur">' +
       '<div><div class="bt-dim">第 ' + (cur.target_issue || '—') + ' 期预测（基于第 ' + (cur.based_on || '—') + ' 期数据生成）</div>' +
-      '<div class="bt-dim" style="margin-top:4px;font-size:11px">每个玩法各推 2 注（按推荐度滑窗取号），命中率按上一期这 2 注的实际开奖结果统计</div></div>' +
+      '<div class="bt-dim" style="margin-top:4px;font-size:11px">每个玩法各推 1 注（按推荐度取号），命中率按上一期这一注的实际开奖结果统计</div></div>' +
       '<div class="ai-side"><div class="ai-logic">' + (cur.logic || '') + '</div>' +
       '<div class="bt-dim">模型：' + (cur.method || '') + ' · 输入模型的数据样本：' + (cur.ctx || '—') + ' 期开奖数据</div></div>' +
     '</div>' +
@@ -1109,7 +1107,7 @@ function tierText(tiers) {
     return (k === '0' ? '全不中' : '中' + k) + ' ' + tiers[k] + ' 注';
   }).join(' · ');
 }
-// 渲染十种玩法卡片：优先生成 2 注（betsMap）；旧快照没有 bets 时退回"取前 n 个"
+// 渲染十种玩法卡片：优先生成 1 注（betsMap）；旧快照没有 bets 时退回"取前 n 个"
 function buildTenGrid(picks10, footFn, betsMap, issue) {
   var cn = '一二三四五六七八九十';
   // 每张卡都先写清"这批号码是哪一期"，再单独给上一期结果，避免把旧结果套在新号码上
@@ -1128,7 +1126,7 @@ function buildTenGrid(picks10, footFn, betsMap, issue) {
         (footFn ? footFn(n) : '') +
         '</div>';
     }
-    // 每注一行；标题栏的复制按钮一次复制全部 2 注（每注一行）
+    // 每注一行；标题栏的复制按钮一次复制全部注号（每注一行）
     var rows = list.map(function (b, i) {
       return '<div class="bet-row"><span class="bet-idx">' + (i + 1) + '</span>' +
         b.map(function (x) { return '<span class="bet-num">' + pad(x) + '</span>'; }).join('') +
@@ -1136,7 +1134,7 @@ function buildTenGrid(picks10, footFn, betsMap, issue) {
     }).join('');
     return '<div class="ten-card">' +
       '<div class="ten-title">选' + cn[n - 1] +
-        '<span class="ten-count">共 ' + (list ? list.length : 2) + ' 注</span>' + copyBtnHTML(list) + '</div>' +
+        '<span class="ten-count">共 ' + (list ? list.length : 1) + ' 注</span>' + copyBtnHTML(list) + '</div>' +
       '<div class="bet-list">' + head + rows + '</div>' +
       (footFn ? footFn(n) : '') +
       '</div>';

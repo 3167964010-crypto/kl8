@@ -734,9 +734,9 @@ ALGOS = [
 
 CONSENSUS_ID = "consensus"      # 重复号码算法的 id，需要特殊处理（汇总其他算法）
 OVERLAP_ID = "overlap"          # 高频重合算法的 id，依赖前八套算法的全部投注号码
-BETS_PER_PLAY = 2               # 预测台（index.html）每种玩法预测的注数（选一~选十各 2 注）
+BETS_PER_PLAY = 1               # 预测台（index.html）每种玩法预测的注数（选一~选十各 1 注）
 ALGO_BETS_PER_PLAY = 1          # 算法对比页（algos.html）每种玩法的注数，与预测台独立
-CFG_VERSION = "v5-algo1bet"     # 算法配置版本：升级时清空受影响的缓存结果并按新规则重算
+CFG_VERSION = "v6-all1bet"      # 算法配置版本：升级时清空受影响的缓存结果并按新规则重算
 
 
 def bets_need_rebuild(bets, count=None):
