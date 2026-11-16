@@ -110,14 +110,55 @@ def fetch_draws_sina(count=100):
     return rows
 
 
+def fetch_draws_17500(count=500):
+    """
+    解析 17500 彩票数据站的快乐8全量历史（纯文本，海外服务器也能访问）。
+    每行格式：期号 日期 20 个两位号码 以及销售额等统计字段，这里只取前三段。
+    GitHub Actions 的海外 runner 访问福彩官网会被 403，故用它作为云端首选数据源。
+    """
+    url = "https://data.17500.cn/kl8_asc.txt"
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                      "(KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+    })
+    ctx = ssl._create_unverified_context()
+    with urllib.request.urlopen(req, timeout=45, context=ctx) as resp:
+        text = resp.read().decode("utf-8", "ignore")
+    rows = []
+    for line in text.splitlines():
+        parts = line.split()
+        # 至少要 22 段：期号 + 日期 + 20 个号码
+        if len(parts) < 22 or not parts[0].isdigit() or len(parts[0]) != 7:
+            continue
+        try:
+            nums = [int(x) for x in parts[2:22]]
+        except ValueError:
+            continue
+        # 号码必须落在 1~80 且互不重复，避免把统计行当成开奖
+        if len(set(nums)) != 20 or any(v < 1 or v > 80 for v in nums):
+            continue
+        rows.append({"code": parts[0], "date": parts[1], "nums": set(nums)})
+    rows.sort(key=lambda r: r["code"])
+    return rows[-count:]
+
+
 def fetch_rows(count=100):
     """
-    合并数据源：以福彩官网为准，官网尚未发布的新期用新浪走势图补齐。
+    数据源优先级：17500 全量文本 → 福彩官网 → 新浪走势图兜底。
     返回按期号升序的最近 count 期。
 
-    多取 12 期再截断：两个数据源更新节奏不同（官网常比新浪晚一期），
-    各自只取 count 期时合并后可能凑不满 count 期，故先多要一些再取尾部。
+    17500 放第一位是因为它在海外 runner 上稳定可访问，且一次就能拿到全部历史；
+    福彩官网接口对海外 IP 返回 403，只在本地/国内环境下作为主力。
     """
+    # 首选：17500（一次拿全量，够 500 期回测）
+    try:
+        rows = fetch_draws_17500(max(count, 501))
+        if len(rows) >= min(count, 30):
+            return rows[-count:]
+    except Exception:
+        pass
+
+    # 备选：福彩官网 + 新浪走势图合并
     need = count + 12
     official = []
     try:
