@@ -234,6 +234,19 @@
   @media (max-width:640px){.ten-grid{grid-template-columns:1fr;}.bet-row{font-size:11px;}}
   ::-webkit-scrollbar-thumb{background:rgba(109,90,156,.28);}
   ::-webkit-scrollbar-track{background:rgba(58,53,46,.06);}
+  /* === 算法 × 玩法 命中率矩阵：首列与表头固定，横向滚动 === */
+  .matrix-wrap{overflow:auto;max-height:520px;border:1px solid var(--rule);border-radius:12px;background:#faf7f1;}
+  .matrix{width:100%;border-collapse:collapse;font-size:12px;min-width:820px;}
+  .matrix th,.matrix td{padding:6px 9px;border-bottom:1px solid var(--rule);text-align:right;white-space:nowrap;}
+  .matrix thead th{background:#e8e1d5;color:var(--ink);font-size:11px;position:sticky;top:0;z-index:1;}
+  /* 算法名固定在左侧，横向滚动时不跟着跑 */
+  .matrix th:first-child,.matrix td:first-child{text-align:left;position:sticky;left:0;background:#faf7f1;z-index:2;}
+  .matrix thead th:first-child{background:#e8e1d5;z-index:3;}
+  .matrix tbody tr:hover td{background:#f4eee4;}
+  .matrix .alg-name{font-weight:700;color:var(--ink);max-width:160px;overflow:hidden;text-overflow:ellipsis;}
+  /* 该玩法下的最高命中率 */
+  .matrix td.best{color:#8a5a12;font-weight:800;background:rgba(154,106,26,.12);}
+  .matrix .col-total{color:#6d5a9c;font-weight:800;}
 </style>
 </head>
 <body>
@@ -248,6 +261,16 @@
 
   <!-- 算法 Tab 栏 -->
   <div class="tabs" id="tabs"></div>
+
+  <!-- 各算法 × 各玩法命中率矩阵：一屏对比全部算法在选一~选十上的表现 -->
+  <div class="card" id="matrixCard">
+    <h3 style="font-size:14px;font-weight:700;margin-bottom:10px;">各算法 × 各玩法 命中率（累计已开奖期）</h3>
+    <div id="matrix">正在计算…</div>
+    <div class="dim" style="font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.7;">
+      每格 = 该算法该玩法 1 注的累计中奖率；<b>金色加粗</b>为该玩法下的最高值，鼠标悬停可看「中奖注数 / 总注数」。
+      合计列 = 十种玩法合并统计，行按合计命中率从低到高排列。
+    </div>
+  </div>
 
   <!-- 当前算法内容 -->
   <div class="card" id="algoCard"><div class="dim">加载中…</div></div>
@@ -266,6 +289,8 @@
 /* ================= 数据加载与渲染（中文注释） ================= */
 var DATA = null;      // /api/algos 返回的完整状态
 var ACTIVE = 'ai';    // 当前选中的算法 id
+// 玩法序号中文：矩阵表头「选一~选十」用，避免多处重复写数组
+var CN = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
 
 /* 每套算法的主题色：Tab 与卡片用各自颜色区分（暖底上统一取低饱和深色） */
 var COLORS = {
@@ -360,6 +385,44 @@ function combinedRate(a) {
   return { win: w, cnt: c, rate: Math.round(w / c * 1000) / 10 };
 }
 
+// ===== 各算法 × 各玩法 命中率矩阵：行=算法（按合计命中率升序），列=选一~选十 + 合计 =====
+function renderMatrix() {
+  var box = document.getElementById('matrix');
+  if (!box || !DATA || !DATA.algos) return;
+  // 先按十玩法合计命中率从低到高排序，没有数据的排最后
+  var list = DATA.algos.slice().sort(function (x, y) {
+    var rx = combinedRate(x), ry = combinedRate(y);
+    return (rx ? rx.rate : -1) - (ry ? ry.rate : -1);
+  });
+  // 每列最高值：用于标出该玩法下表现最好的算法
+  var best = {};
+  for (var n = 1; n <= 10; n++) {
+    best[n] = -1;
+    list.forEach(function (a) {
+      var p = (a.play_rates || {})[String(n)] || {};
+      if (p.cnt) best[n] = Math.max(best[n], Number(p.rate) || 0);
+    });
+  }
+  var head = '<tr><th>算法</th>';
+  for (var i = 1; i <= 10; i++) head += '<th>选' + CN[i - 1] + '</th>';
+  head += '<th>合计</th></tr>';
+  var body = list.map(function (a) {
+    var tds = '<td class="alg-name" title="' + a.name + '">' + a.name + '</td>';
+    for (var n = 1; n <= 10; n++) {
+      var p = (a.play_rates || {})[String(n)] || {};
+      var r = Number(p.rate) || 0;
+      var cls = (p.cnt && r === best[n]) ? 'best' : '';        // 该玩法最高命中率
+      var txt = p.cnt ? r.toFixed(1) + '%' : '—';
+      tds += '<td class="' + cls + '" title="中 ' + (p.win || 0) + ' / ' + (p.cnt || 0) + ' 注">' + txt + '</td>';
+    }
+    var comb = combinedRate(a);
+    tds += '<td class="col-total">' + (comb ? comb.rate.toFixed(1) + '%' : '—') + '</td>';
+    return '<tr>' + tds + '</tr>';
+  }).join('');
+  box.innerHTML = '<div class="matrix-wrap"><table class="matrix"><thead>' + head +
+    '</thead><tbody>' + body + '</tbody></table></div>';
+}
+
 function renderTabs() {
   document.getElementById('tabs').innerHTML = DATA.algos.map(function (a) {
     var comb = combinedRate(a);
@@ -388,6 +451,7 @@ function renderTabs() {
       renderAlgo();
     });
   }
+  renderMatrix();     // 数据更新后同步刷新矩阵表
 }
 
 // ===== 复制号码：写入剪贴板并在底部提示 =====
