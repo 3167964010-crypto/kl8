@@ -78,6 +78,20 @@
   .ai-state.ok{color:#2f6b3a;background:rgba(70,150,90,.10);border-color:rgba(70,150,90,.35);}
   .ai-state.warn{color:#8a5a12;background:rgba(192,138,46,.10);border-color:rgba(192,138,46,.35);}
 
+  /* === 算法 × 玩法 命中率矩阵：横向滚动，首列与表头固定 === */
+  .matrix-wrap{overflow:auto;max-height:520px;border:1px solid var(--rule);border-radius:10px;background:#fffdf9;}
+  .matrix{width:100%;border-collapse:collapse;font-size:12px;min-width:820px;}
+  .matrix th,.matrix td{padding:6px 9px;border-bottom:1px solid var(--rule);text-align:right;white-space:nowrap;}
+  .matrix thead th{background:#f4eee4;font-size:11px;color:#6b6357;position:sticky;top:0;z-index:1;}
+  /* 首列（算法名）固定，横向滚动时不跟着跑 */
+  .matrix th:first-child,.matrix td:first-child{text-align:left;position:sticky;left:0;background:#fffdf9;z-index:2;}
+  .matrix thead th:first-child{background:#f4eee4;z-index:3;}
+  .matrix tbody tr:hover td{background:#fbf6ee;}
+  .matrix .alg-name{font-weight:700;color:#3f3a33;max-width:160px;overflow:hidden;text-overflow:ellipsis;}
+  /* 该玩法下的最高命中率 */
+  .matrix td.best{color:#8a5a12;font-weight:800;background:rgba(192,138,46,.10);}
+  .matrix .col-total{color:var(--accent);font-weight:800;}
+
   /* === 回测表 === */
   .table-wrap{overflow-x:auto;border:1px solid var(--rule);border-radius:10px;}
   table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:900px;background:#fffdf9;}
@@ -123,6 +137,14 @@
 
   <!-- 算法切换：每个逻辑一套，主数字为近 20 期十玩法合计中奖率 -->
   <div class="tabs" id="tabs"></div>
+
+  <!-- 各算法 × 各玩法命中率矩阵：一屏对比全部算法在选一~选十上的表现 -->
+  <div class="card" id="matrixCard">
+    <h3>各算法 × 各玩法 命中率（近 <span id="matrixBack">300</span> 期回测）</h3>
+    <div id="matrix">正在计算…</div>
+    <div class="legend">每格 = 该算法该玩法 1 注的累计中奖率；<b>金色加粗</b>为该玩法下的最高值，
+      鼠标悬停可看「命中注数 / 总注数」。合计列 = 十种玩法合并统计，行按合计命中率从低到高排列。</div>
+  </div>
 
   <!-- 详情：说明 + 下一期一注预测 + 十玩法命中率 + 往期回测 -->
   <div class="card" id="detail" style="display:none"></div>
@@ -674,6 +696,54 @@ function ballsHTML(list, hitSet, cls) {
   }).join('') + '</div>';
 }
 
+/* 各算法 × 各玩法 命中率矩阵：行=算法（按合计命中率升序），列=选一~选十 + 合计 */
+function renderMatrix() {
+  var box = document.getElementById('matrix');
+  if (!box) return;
+  /* 与 Tab 保持一致：大模型未接入时隐藏「AI 自学习」，否则会和本地自学习结果重复 */
+  var list = ALGOS.filter(function (a) {
+    return RESULTS[a.id] && !(a.ai && !AI_STATE.ok);
+  });
+  if (!list.length) return;
+  var rateOf = function (id) {
+    var st = RESULTS[id];
+    return st.total ? st.win / st.total : 0;
+  };
+  list.sort(function (x, y) { return rateOf(x.id) - rateOf(y.id); });   // 命中率升序
+
+  /* 先算每列最高值，用于高亮「该玩法最强」的算法 */
+  var best = {};
+  for (var n = 1; n <= 10; n++) {
+    best[n] = -1;
+    list.forEach(function (a) {
+      var p = RESULTS[a.id].plays[n];
+      var r = p.total ? p.win / p.total : 0;
+      if (r > best[n]) best[n] = r;
+    });
+  }
+
+  var head = '<tr><th>算法</th>';
+  for (var i = 1; i <= 10; i++) head += '<th>选' + CN[i - 1] + '</th>';
+  head += '<th>合计</th></tr>';
+
+  var body = list.map(function (a) {
+    var st = RESULTS[a.id];
+    var tds = '<td class="alg-name" title="' + a.name + '">' + a.name + '</td>';
+    for (var n = 1; n <= 10; n++) {
+      var p = st.plays[n];
+      var r = p.total ? p.win / p.total : 0;
+      var txt = p.total ? (r * 100).toFixed(1) + '%' : '—';
+      var cls = (p.total && r > 0 && r === best[n]) ? 'best' : '';   // 该玩法最高命中率
+      tds += '<td class="' + cls + '" title="中 ' + p.win + ' / ' + p.total + ' 注">' + txt + '</td>';
+    }
+    tds += '<td class="col-total">' + (st.total ? (st.win / st.total * 100).toFixed(1) + '%' : '—') + '</td>';
+    return '<tr>' + tds + '</tr>';
+  }).join('');
+
+  box.innerHTML = '<div class="matrix-wrap"><table class="matrix"><thead>' + head +
+    '</thead><tbody>' + body + '</tbody></table></div>';
+}
+
 /* Tab：算法名 + 十玩法合计中奖率；按命中率从小到大排列，并标出连中情况 */
 function renderTabs(curId) {
   var box = document.getElementById('tabs');
@@ -696,6 +766,7 @@ function renderTabs(curId) {
   Array.prototype.forEach.call(box.querySelectorAll('.tab'), function (el) {
     el.addEventListener('click', function () { show(el.getAttribute('data-id')); });
   });
+  renderMatrix();       // 结果刷新时同步更新矩阵表
 }
 
 /* 详情：说明 + 下一期预测 + 十玩法命中率 + 往期回测 */
@@ -917,6 +988,9 @@ loadData().then(function (rows) {
   var info = '已加载 <b>' + rows.length + '</b> 期开奖（' + rows[0].code + ' ~ ' + rows[rows.length - 1].code +
     '） · 回测 <b>' + Math.min(BACK, rows.length - MINHIST) + '</b> 期 · 每玩法 <b>1</b> 注';
   document.getElementById('status').innerHTML = info + ' · <b>正在计算…</b>';
+  /* 矩阵标题里的回测期数按实际数据展示 */
+  var backEl = document.getElementById('matrixBack');
+  if (backEl) backEl.textContent = Math.min(BACK, rows.length - MINHIST);
   /* 几百期数据 × 19 套算法要算一两秒，先让浏览器把提示画出来再开始，避免看起来像卡死 */
   setTimeout(function () {
     try {
