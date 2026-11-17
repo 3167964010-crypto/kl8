@@ -678,6 +678,9 @@ def settle_and_predict(rows=None):
         "backtest10": backtest10(model_rows),         # 十种玩法回测与理论中奖概率
         "records": build_history(rows, 100),          # 最近 100 期：预测号码 + 实际开奖 + 命中
         "next_draw_time": next_draw_time(rows),       # 下一期计划开奖时间（每天一期，21:30）
+        # 数据版本：页面直接显示，便于区分「线上没更新」和「浏览器用了旧缓存」
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "latest_code": rows[-1]["code"] if rows else "",
     }
 
 

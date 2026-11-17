@@ -346,6 +346,8 @@
       <!-- 算法验证页：按《彩票算法总览》每种逻辑各写一套，独立页面可整体撤回 -->
       <a class="chart-open" href="test_algos.html?v=2" style="margin-left:8px">算法验证 →</a>
       <button class="btn" id="refreshBtn">↻ 立即同步</button>
+      <!-- 强制刷新：清掉浏览器缓存与离线缓存后重新加载，专治长期停在旧页面 -->
+      <button class="btn" id="forceBtn" style="background:linear-gradient(135deg,#8d6e3a,#5c4526);box-shadow:none;">强制刷新</button>
     </div>
   </header>
 
@@ -355,6 +357,8 @@
     <span>本期开奖 <b id="lastDate">—</b></span>
     <span>下期开奖 <b id="nextDate">—</b></span>
     <span>同步时间 <b id="syncTime">—</b></span>
+    <!-- 数据版本：直接显示线上快照的最新期号与生成时间，用于判断拿到的到底是不是新数据 -->
+    <span>数据版本 <b id="dataVer">—</b></span>
   </div>
 
   <!-- 最新开奖 -->
@@ -1031,6 +1035,11 @@ function renderPredict(p) {
     return;
   }
   var cur = p.current || {};
+  // 数据版本：快照里的最新开奖期号 + 生成时间，用户一眼可判断是否为新数据
+  var verEl = document.getElementById('dataVer');
+  if (verEl) {
+    verEl.textContent = (p.latest_code || '—') + ' · ' + (p.generated_at || '—');
+  }
   // 滚动命中率文字：如 66.67%（已结算 3 期，命中 2 期）
   var rateTxt = p.total
     ? '<b>' + p.rate.toFixed(2) + '%</b>（已结算 ' + p.total + ' 期，命中 ' + p.hits + ' 期）'
@@ -1220,6 +1229,29 @@ document.getElementById('llmToggle').addEventListener('click', function () {
 document.getElementById('llmSave').addEventListener('click', saveLlmConf);
 document.getElementById('llmTest').addEventListener('click', testLlmConf);
 document.getElementById('refreshBtn').addEventListener('click', loadData);
+
+// 强制刷新：注销 Service Worker、清空所有缓存后再重新加载。
+// 手机上"一直不更新"多半是离线缓存或浏览器缓存把旧页面钉死了，这里是最终兜底手段。
+document.getElementById('forceBtn').addEventListener('click', function () {
+  var btn = this;
+  btn.disabled = true;
+  btn.textContent = '清理中…';
+  var tasks = [];
+  if ('serviceWorker' in navigator) {
+    tasks.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+      return Promise.all(rs.map(function (r) { return r.unregister(); }));
+    }).catch(function () {}));
+  }
+  if (window.caches && caches.keys) {
+    tasks.push(caches.keys().then(function (keys) {
+      return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+    }).catch(function () {}));
+  }
+  Promise.all(tasks).then(function () {
+    // 带上时间戳，确保拿到的是 CDN 上的最新副本
+    location.replace(location.pathname + '?fresh=' + Date.now());
+  });
+});
 document.getElementById('analyzeBtn').addEventListener('click', analyzeSelf);
 document.getElementById('selfInput').addEventListener('keydown', function (e) {
   if (e.key === 'Enter') analyzeSelf();
@@ -1240,8 +1272,9 @@ window.addEventListener('focus', loadData);   // 切回页面立即同步一次
 
 // 注册离线缓存：添加到主屏幕后，断网也能查看上次同步的数据
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-  // updateViaCache:'none' 让浏览器每次都拿最新的 sw.js，不受 HTTP 缓存影响
-  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+  // updateViaCache:'none' 让浏览器每次都拿最新的 sw.js，不受 HTTP 缓存影响；
+  // 脚本地址带上版本号，强制浏览器换掉以前注册的旧 SW（旧 SW 会把旧页面钉死）
+  navigator.serviceWorker.register('sw.js?v=3', { updateViaCache: 'none' })
     .then(function (reg) {
       // 主动检查一次更新，新版本 SW 会在后台接管，页面随后自动刷成最新
       if (reg.update) reg.update().catch(function () {});
@@ -1250,6 +1283,6 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 }
 </script>
 <!-- 页面版本标识：用于快速判断浏览器拿到的是新版还是缓存旧版 -->
-<div style="text-align:center;font-size:11px;color:#a89e90;margin-top:18px;letter-spacing:.04em;">页面版本 v7 · 每种玩法 1 注</div>
+<div style="text-align:center;font-size:11px;color:#a89e90;margin-top:18px;letter-spacing:.04em;">页面版本 v8 · 每种玩法 1 注</div>
 </body>
 </html>

@@ -2,7 +2,7 @@
 // 这样手机断网仍能打开页面，在线时一定拿到最新版本与最新开奖
 
 // 缓存版本：改动页面或数据口径时递增，旧的缓存会在 activate 时被清掉
-const CACHE = 'kl8-cache-v2';
+const CACHE = 'kl8-cache-v3';
 
 // 首次安装时预缓存核心页面与数据快照
 const CORE = [
@@ -21,9 +21,18 @@ const CORE = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE)
-      .then((cache) => cache.addAll(CORE))
+      // 逐个缓存而不是 addAll：addAll 是"全成功才成功"，
+      // 一旦某个文件 404，新 SW 就永远装不上，老 SW 会一直把旧页面喂给用户。
+      .then((cache) => Promise.all(
+        CORE.map((url) => cache.add(url).catch(() => {}))
+      ))
       .then(() => self.skipWaiting())
   );
+});
+
+// 页面可主动通知 SW 立刻接管，避免更新要等下一次打开才生效
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
