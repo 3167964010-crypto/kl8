@@ -733,7 +733,7 @@ function renderBacktest() {
     { name: '选四 · 1 注', avg: avg(res.four), base: '1.00',
       hit: pct(res.four, function (v) { return v >= 2; }), hitBase: '25.89', unit: '中 ≥ 2 个' },
     { name: '选十 · 1 注', avg: avg(res.ten), base: '2.50',
-      hit: pct(res.ten, function (v) { return v >= 5 || v === 0; }), hitBase: '11.05', unit: '中 ≥ 5 个或全不中' }
+      hit: pct(res.ten, function (v) { return v >= 5; }), hitBase: '6.47', unit: '中 ≥ 5 个（不含全不中返奖）' }
   ];
   var html = rows.map(function (r) {
     return '<div class="bt-row"><span class="bt-name">' + r.name + '</span>' +

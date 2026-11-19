@@ -175,8 +175,8 @@
       </table>
     </div>
     <div class="legend">
-      注数 = 已结算期数（每期该玩法 1 注）；中奖次数 = 命中档位且奖金大于 0 的期数；
-      选七/八/九/十 全不中返 2 元计入中奖次数。
+      注数 = 已结算期数（每期该玩法 1 注）；中奖次数 = 命中奖级且奖金大于 0 的期数；
+      选七/八/九/十 全不中返 2 元属返奖，不计入中奖次数，也不参与命中率统计。
     </div>
   </div>
 
@@ -188,14 +188,14 @@
         <thead>
           <tr>
             <th>玩法</th><th>中10个</th><th>中9个</th><th>中8个</th><th>中7个</th><th>中6个</th>
-            <th>中5个</th><th>中4个</th><th>中3个</th><th>中2个</th><th>中1个</th><th>全不中</th>
+            <th>中5个</th><th>中4个</th><th>中3个</th><th>中2个</th><th>中1个</th>
           </tr>
         </thead>
         <tbody id="tierBody"></tbody>
       </table>
     </div>
     <div class="legend">
-      横看一行即该玩法的全部奖级；「—」表示该档位没有奖金。选七/八/九/十 全不中返 2 元。
+      横看一行即该玩法的全部奖级；「—」表示该档位没有奖金。选七/八/九/十 全不中返 2 元属返奖，不列入本表。
     </div>
   </div>
 </div>
@@ -293,7 +293,7 @@ function renderTiers() {
   for (var n = 1; n <= 10; n++) {
     var row = tbl[String(n)] || {};
     var cells = '<td class="issue">选' + names[n - 1] + '</td>';
-    // 从高到低列出中 10 个 → 中 1 个，最后是全不中
+    // 从高到低列出中 10 个 → 中 1 个（全不中返奖不计入）
     for (var k = 10; k >= 1; k--) {
       var v = row[String(k)];
       var has = (v !== undefined && Number(v) > 0);
@@ -301,9 +301,6 @@ function renderTiers() {
       cells += '<td class="' + (has ? 'win' : 'lose') + '">' +
                (has ? money(v) : '—') + '</td>';
     }
-    var zero = row['0'];
-    cells += '<td class="' + (zero ? 'win' : 'lose') + '">' +
-             (zero ? money(zero) : '—') + '</td>';
     html += '<tr>' + cells + '</tr>';
   }
   document.getElementById('tierBody').innerHTML = html;

@@ -306,7 +306,12 @@ def model_pick(rows):
 # ================= 十种玩法：中奖判定与概率 =================
 
 def prize_hit(n, k):
-    """快乐8官方规则：选 n 个号码命中 k 个是否有返奖（含选八/九/十全不中返 2 元）"""
+    """
+    快乐8官方规则：选 n 个号码命中 k 个是否算"命中"。
+    注意：选七~选十"全不中返 2 元"属于返奖，不是命中，统计命中率时一律排除（k 必须 ≥ 1）。
+    """
+    if k < 1:
+        return False                   # 一个号码都没中，不算命中（不含返奖）
     if n == 1:
         return k >= 1
     if n == 2:
@@ -316,8 +321,8 @@ def prize_hit(n, k):
     if n in (5, 6):
         return k >= 3
     if n in (7, 8, 9):
-        return k >= 4 or k == 0      # 选七/八/九：中 4 个及以上有奖，全不中也返 2 元
-    return k >= 5 or k == 0            # 选十
+        return k >= 4
+    return k >= 5                      # 选十
 
 
 def theo_prize_prob(n):
@@ -330,6 +335,7 @@ def theo_prize_prob(n):
 
 
 # 快乐8官方奖金表（每注 2 元）：选 n 玩法命中 k 个对应的奖金（元）
+# 说明：选七~选十的"全不中返 2 元"是返奖，不是命中，故不列入奖金表，也不参与命中率统计
 PRIZE_TABLE = {
     1:  {1: 4.6},
     2:  {2: 19},
@@ -337,15 +343,20 @@ PRIZE_TABLE = {
     4:  {4: 100, 3: 5, 2: 3},
     5:  {5: 1000, 4: 21, 3: 3},
     6:  {6: 3000, 5: 30, 4: 10, 3: 3},
-    7:  {7: 10000, 6: 288, 5: 28, 4: 4, 0: 2},
-    8:  {8: 50000, 7: 800, 6: 88, 5: 10, 4: 3, 0: 2},
-    9:  {9: 300000, 8: 2000, 7: 200, 6: 20, 5: 5, 4: 3, 0: 2},
-    10: {10: 5000000, 9: 8000, 8: 800, 7: 80, 6: 5, 5: 3, 0: 2},
+    7:  {7: 10000, 6: 288, 5: 28, 4: 4},
+    8:  {8: 50000, 7: 800, 6: 88, 5: 10, 4: 3},
+    9:  {9: 300000, 8: 2000, 7: 200, 6: 20, 5: 5, 4: 3},
+    10: {10: 5000000, 9: 8000, 8: 800, 7: 80, 6: 5, 5: 3},
 }
 
 
 def prize_amount(n, k):
-    """选 n 玩法命中 k 个的单注奖金（元），无奖返回 0"""
+    """
+    选 n 玩法命中 k 个的单注奖金（元），无奖返回 0。
+    一个号码都没中（k=0）的"返奖 2 元"不计入：它不体现选号能力，统计命中率时排除。
+    """
+    if k < 1:
+        return 0
     return PRIZE_TABLE.get(n, {}).get(k, 0)
 
 
@@ -1088,6 +1099,18 @@ def settle_algos(rows):
                                       for n in range(1, 11)}
                     rec["prize_total"] = round(sum(rec["prize10"].values()), 2)
                     changed = True
+                # 兼容旧数据：早期把选七~选十"全不中返 2 元"也记成中奖，
+                # 返奖不体现选号能力，这里统一清零，避免历史命中率被虚高
+                if rec.get("settled") and rec.get("hits10"):
+                    fixed = False
+                    for n in range(1, 11):
+                        kk = rec["hits10"].get(str(n))
+                        if kk is not None and int(kk) < 1 and (rec.get("prize10") or {}).get(str(n)):
+                            rec["prize10"][str(n)] = 0
+                            fixed = True
+                    if fixed:
+                        rec["prize_total"] = round(sum(rec["prize10"].values()), 2)
+                        changed = True
         # 第 2 步：生成该套算法的下一期预测（每期只生成一次）
         cur = None
         for rec in box["history"]:
