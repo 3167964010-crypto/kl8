@@ -1,0 +1,226 @@
+<!-- 连未中累计命中率页：每个算法 × 每个玩法，按"连续未中期数"累加当前命中率，中奖后清零重算 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>连未中 · 当前命中率 · 快乐8</title>
+<!-- 访问口令门禁：未通过时先隐藏页面 -->
+<script src="gate.js"></script>
+<style>
+  /* === 护眼米黄暖灰主题（与算法对比页一致） === */
+  :root{
+    --bg:#efeae2; --bg2:#faf7f1; --ink:#3a352e; --muted:#7d766a;
+    --rule:rgba(58,53,46,.12); --accent:#9a6a1a; --accent2:#6d5a9c;
+    --font:'Microsoft YaHei','PingFang SC','Noto Sans SC',-apple-system,sans-serif;
+    --max:1120px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:var(--font);color:var(--ink);line-height:1.7;font-size:15px;padding:22px 16px 52px;min-height:100vh;
+       background:
+         radial-gradient(900px 520px at 88% -12%, rgba(109,90,156,.07), transparent 62%),
+         radial-gradient(820px 500px at -8% 4%, rgba(154,106,26,.08), transparent 58%),
+         linear-gradient(180deg,#f4f0e9 0%,#eae4d9 55%,#f4f0e9 100%);
+       background-attachment:fixed;}
+  .page{max-width:var(--max);margin:0 auto;}
+
+  /* === 顶栏 === */
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding-bottom:14px;border-bottom:1px solid var(--rule);}
+  .title{font-size:26px;font-weight:800;letter-spacing:.01em;
+         background:linear-gradient(90deg,#8a5a12,#6d5a9c);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .title small{display:block;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:2px;-webkit-text-fill-color:var(--accent);}
+  .navlink{display:inline-block;font-size:12px;color:var(--accent);font-weight:700;text-decoration:none;
+           border:1px solid rgba(154,106,26,.32);border-radius:8px;padding:6px 12px;background:rgba(154,106,26,.06);white-space:nowrap;margin-left:6px;}
+  .statusbar{font-size:12.5px;color:var(--muted);padding:12px 0;}
+  .statusbar b{color:var(--ink);font-variant-numeric:tabular-nums;}
+
+  /* === 卡片 === */
+  .card{background:#faf7f1;border:1px solid var(--rule);border-radius:14px;padding:16px 18px;margin-top:14px;
+        box-shadow:0 1px 2px rgba(90,76,58,.05),0 6px 18px rgba(90,76,58,.06);}
+  .card h3{font-size:14px;font-weight:700;margin-bottom:10px;padding-left:10px;border-left:3px solid var(--accent);}
+
+  /* === 算法 Tab === */
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;}
+  .tab{border:1px solid var(--rule);border-radius:10px;padding:9px 13px;cursor:pointer;background:#fffdf9;
+       color:var(--muted);font-size:13px;font-weight:700;min-width:132px;text-align:left;transition:all .15s;}
+  .tab small{display:block;font-size:11px;font-weight:400;margin-top:2px;color:var(--muted);}
+  .tab.on{border-color:rgba(154,106,26,.5);background:rgba(154,106,26,.09);color:var(--ink);box-shadow:0 2px 10px rgba(109,90,156,.16);}
+  .tab:hover{border-color:rgba(154,106,26,.40);}
+
+  /* === 明细表 === */
+  .table-wrap{overflow:auto;border:1px solid var(--rule);border-radius:12px;background:#fffdf9;}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:520px;}
+  th{background:#f4eee4;text-align:left;font-size:11.5px;font-weight:700;padding:8px 11px;border-bottom:1px solid var(--rule);white-space:nowrap;}
+  td{padding:8px 11px;border-bottom:1px solid var(--rule);font-variant-numeric:tabular-nums;}
+  tr:last-child td{border-bottom:none;}
+  tbody tr:hover td{background:#fbf6ee;}
+  /* 当前命中率分档配色：越低越淡，越高越醒目 */
+  .lv0{color:var(--muted);}
+  .lv1{color:#2f6f8f;font-weight:700;}
+  .lv2{color:#9a6a1a;font-weight:800;}
+  .lv3{color:#b4452f;font-weight:800;}
+  .lv4{color:#8c1d1d;font-weight:800;}
+  .streak{font-weight:800;color:var(--accent2);}
+  .muted{color:var(--muted);font-size:11.5px;}
+
+  /* === 说明 === */
+  .note{background:#fffdf9;border-left:3px solid var(--accent);border-radius:8px;padding:12px 16px;
+        font-size:12.5px;color:var(--muted);margin-top:16px;line-height:1.9;}
+  .note b{color:var(--ink);}
+  footer{text-align:center;font-size:11px;color:var(--muted);margin-top:18px;}
+
+  /* === 手机端适配 === */
+  @media (max-width:640px){
+    body{padding:14px 10px 40px;font-size:14px;}
+    .title{font-size:21px;}
+    .topbar .title{flex:1 1 100%;}
+    .topbar .navlink{flex:1 1 44%;margin-left:0;text-align:center;padding:8px;}
+    .tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    .tab{min-width:0;padding:8px 9px;font-size:12px;}
+    th,td{padding:7px 8px;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="topbar">
+    <div class="title"><small>UNHIT ACCUMULATE · 未中累加</small>连未中 · 当前命中率</div>
+    <div>
+      <a class="navlink" href="index.html">← 返回预测台</a>
+      <a class="navlink" href="algos.html">算法对比</a>
+      <a class="navlink" href="test_algos.html?v=3">算法验证</a>
+    </div>
+  </div>
+
+  <div class="statusbar" id="status">正在加载…</div>
+
+  <!-- 算法选择 -->
+  <div class="card">
+    <h3>选择算法</h3>
+    <div class="tabs" id="tabs"></div>
+  </div>
+
+  <!-- 十种玩法的基准命中率 / 连续未中 / 当前命中率 -->
+  <div class="card">
+    <h3 id="detailTitle">各玩法当前命中率</h3>
+    <div class="table-wrap" id="detail">正在计算…</div>
+  </div>
+
+  <div class="note">
+    <b>计算规则：</b>当前命中率 = 该玩法基准命中率 ×（连续未中期数 + 1）。
+    基准命中率取「算法对比」页里该玩法 1 注的累计命中率，会随每期开奖实时更新；
+    <b>一旦该玩法中奖，连续未中清零</b>，下一期从基准值重新开始累加。
+    例：基准 30%，未中 0 期显示 30%，未中 1 期 60%，未中 2 期 90%，未中 3 期 120%，中奖后回到 30%。
+    本页仅做概率累加展示，不代表必中，请理性参考。
+  </div>
+
+  <footer>连未中累计 · 数据与算法对比页同源（algos_snapshot.json）</footer>
+</div>
+
+<script>
+/* ================= 连未中累计命中率 ================= */
+var CN = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+var DATA = null;      // algos_snapshot.json 的完整内容
+var ACTIVE = '';      // 当前选中的算法 id
+
+/* 取某算法某玩法 1 注的累计命中率（百分数）；没有数据返回 null */
+function baseRate(algo, n) {
+  var p = (algo.play_rates || {})[String(n)] || {};
+  return p.cnt ? Number(p.rate) : null;
+}
+
+/* 连续未中期数：从最近一期已结算记录往前数，遇到中奖立即停止 */
+function missStreak(algo, n) {
+  var hs = algo.history || [];
+  var st = 0;
+  for (var i = 0; i < hs.length; i++) {
+    var h = hs[i];
+    if (!h.settled) continue;                       // 还没开奖的期跳过
+    var pz = (h.prize10 || {})[String(n)];
+    if (pz === undefined || pz === null) continue;  // 这期没有该玩法数据
+    if (Number(pz) > 0) break;                      // 这注中了 → 连续未中结束
+    st++;
+  }
+  return st;
+}
+
+/* 按当前累计值给颜色分档 */
+function lvClass(v) {
+  if (v === null) return 'lv0';
+  if (v >= 100) return 'lv4';
+  if (v >= 60) return 'lv3';
+  if (v >= 30) return 'lv2';
+  return 'lv1';
+}
+
+function renderTabs() {
+  var box = document.getElementById('tabs');
+  box.innerHTML = DATA.algos.map(function (a) {
+    /* Tab 上显示该算法十玩法里当前最高的累计命中率，方便快速定位 */
+    var max = 0;
+    for (var n = 1; n <= 10; n++) {
+      var b = baseRate(a, n);
+      if (b === null) continue;
+      var cur = b * (missStreak(a, n) + 1);
+      if (cur > max) max = cur;
+    }
+    return '<div class="tab' + (a.id === ACTIVE ? ' on' : '') + '" data-id="' + a.id + '">' +
+      a.name + '<small>最高累计 ' + max.toFixed(1) + '%</small></div>';
+  }).join('');
+  // 点击切换算法
+  Array.prototype.forEach.call(box.querySelectorAll('.tab'), function (el) {
+    el.addEventListener('click', function () {
+      ACTIVE = el.getAttribute('data-id');
+      renderTabs();
+      renderDetail();
+    });
+  });
+}
+
+/* 明细表：选一~选十 的基准命中率、连续未中期数、当前命中率 */
+function renderDetail() {
+  var algo = DATA.algos.filter(function (a) { return a.id === ACTIVE; })[0];
+  if (!algo) return;
+  document.getElementById('detailTitle').textContent = algo.name + ' · 各玩法当前命中率';
+
+  var rows = '';
+  for (var n = 1; n <= 10; n++) {
+    var b = baseRate(algo, n);
+    var st = missStreak(algo, n);
+    var cur = b === null ? null : b * (st + 1);     // 基准 ×（未中期数+1），不封顶
+    rows += '<tr>' +
+      '<td><b>选' + CN[n - 1] + '</b></td>' +
+      '<td>' + (b === null ? '—' : b.toFixed(1) + '%') + '</td>' +
+      '<td class="streak">' + st + ' 期</td>' +
+      '<td class="' + lvClass(cur) + '">' + (cur === null ? '—' : cur.toFixed(1) + '%') + '</td>' +
+      '<td class="muted">' + (cur === null ? '—' : '基准 ' + b.toFixed(1) + '% × ' + (st + 1)) + '</td>' +
+      '</tr>';
+  }
+  document.getElementById('detail').innerHTML =
+    '<table><thead><tr><th>玩法</th><th>基准命中率</th><th>连续未中</th><th>当前命中率</th><th>计算</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table>';
+}
+
+/* 加载数据：带时间戳并禁用缓存，确保每次都是最新快照 */
+function loadData() {
+  document.getElementById('status').textContent = '正在加载…';
+  fetch('algos_snapshot.json?t=' + Date.now(), { cache: 'no-store' })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      DATA = d;
+      if (!ACTIVE && d.algos && d.algos.length) ACTIVE = d.algos[0].id;
+      renderTabs();
+      renderDetail();
+      var issue = (d.algos[0] && d.algos[0].history && d.algos[0].history[0] && d.algos[0].history[0].target) || '—';
+      document.getElementById('status').innerHTML =
+        '已同步 · 下一期 <b>第 ' + issue + ' 期</b> · 共 <b>' + d.algos.length + '</b> 套算法';
+    })
+    .catch(function () {
+      document.getElementById('status').textContent = '加载失败，请刷新重试';
+    });
+}
+
+loadData();
+</script>
+</body>
+</html>

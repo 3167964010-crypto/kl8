@@ -2,7 +2,7 @@
 // 这样手机断网仍能打开页面，在线时一定拿到最新版本与最新开奖
 
 // 缓存版本：改动页面或数据口径时递增，旧的缓存会在 activate 时被清掉
-const CACHE = 'kl8-cache-v3';
+const CACHE = 'kl8-cache-v4';
 
 // 首次安装时预缓存核心页面与数据快照
 const CORE = [
@@ -11,6 +11,7 @@ const CORE = [
   './algos.html',
   './prize.html',
   './test_algos.html',
+  './unhit.html',
   './snapshot.json',
   './algos_snapshot.json',
   './kl8_snapshot.json',
