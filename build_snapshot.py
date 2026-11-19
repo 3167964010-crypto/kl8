@@ -10,6 +10,7 @@ import json
 import os
 import sys
 import time
+from datetime import datetime, timedelta
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE)
@@ -47,6 +48,11 @@ def latest_issue():
         return ""
 
 
+def bj_now():
+    """北京时间（runner 默认 UTC，+8 得到北京时间）"""
+    return datetime.utcnow() + timedelta(hours=8)
+
+
 def wait_for_new(before, wait_min):
     """
     开奖后刚触发任务时，官方数据往往还没发布。
@@ -55,10 +61,15 @@ def wait_for_new(before, wait_min):
     """
     if wait_min <= 0:
         return fetch_with_retry()
+    today = bj_now().strftime("%Y-%m-%d")   # 北京时间今天
     deadline = time.time() + wait_min * 60
     while True:
         rows = fetch_with_retry(times=2, wait=15)
         cur = rows[-1]["code"] if rows else ""
+        # 已经抓到今天的开奖就直接结束，不必空等（避免晚上重复触发时空耗 runner）
+        if len(rows) >= 120 and rows[-1].get("date", "")[:10] == today:
+            print("今天（%s）的 %s 已在数据里，无需等待" % (today, cur))
+            return rows
         if len(rows) >= 120 and cur and cur > before:
             print("已抓到新一期 %s（原 %s），立即生成快照" % (cur, before or "—"))
             return rows
@@ -75,6 +86,11 @@ def main():
 
     # 多抓一些：算法验证页要回测 300 期，需要 500 期历史；其它快照只用最近 100 期
     wait_min = int(os.environ.get("KL8_WAIT_MIN", "0") or 0)
+    # 北京时间 20 点以后把等待窗口放大到 100 分钟：
+    # GitHub 的定时任务会被大幅延迟甚至漏掉（实测 6 天只跑了 23 次，应约 190 次），
+    # 只要这一轮在 20:00 后启动，就一直等到抓到当天开奖再生成，避免白跑。
+    if bj_now().hour >= 20 and wait_min < 100:
+        wait_min = 100
     rows = wait_for_new(latest_issue(), wait_min)
     if len(rows) < 120:
         # 保留上一次已生成的快照，不让线上数据被清空；同时打警告，避免"全绿但没更新"
