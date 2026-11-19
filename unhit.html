@@ -111,6 +111,12 @@
     <div class="table-wrap" id="detail">正在计算…</div>
   </div>
 
+  <!-- 全部命中记录：期号 / 算法 / 玩法 / 号码 / 命中个数 / 当时命中率 / 奖金 -->
+  <div class="card">
+    <h3 id="winTitle">命中记录（自 2026291 期起）</h3>
+    <div class="table-wrap" id="winTable">正在计算…</div>
+  </div>
+
   <div class="note">
     <b>计算规则：</b>当前命中率 = 该玩法基准命中率 ×（连续未中期数 + 1）。
     基准命中率取「算法对比」页里该玩法 1 注的累计命中率，会随每期开奖实时更新；
@@ -118,6 +124,7 @@
     例：基准 30%，未中 0 期显示 30%，未中 1 期 60%，未中 2 期 90%，未中 3 期 120%，中奖后回到 30%。
     「最近命中期号 / 号码」展示该玩法最近一次中奖的期号、那一注号码（<b style="color:#b4452f">红色为命中号码</b>）、命中个数与奖金。
     本页仅做概率累加展示，不代表必中，请理性参考。
+    <b>统计起点：第 2026291 期</b>（该站第一次预测），命中记录表按同一区间统计。
   </div>
 
   <footer>连未中累计 · 数据与算法对比页同源（algos_snapshot.json）</footer>
@@ -254,6 +261,7 @@ function loadData() {
       if (!ACTIVE && d.algos && d.algos.length) ACTIVE = d.algos[0].id;
       renderTabs();
       renderDetail();
+      renderWins();
       var issue = (d.algos[0] && d.algos[0].history && d.algos[0].history[0] && d.algos[0].history[0].target) || '—';
       document.getElementById('status').innerHTML =
         '已同步 · 下一期 <b>第 ' + issue + ' 期</b> · 共 <b>' + d.algos.length + '</b> 套算法';
@@ -261,6 +269,76 @@ function loadData() {
     .catch(function () {
       document.getElementById('status').textContent = '加载失败，请刷新重试';
     });
+}
+
+/* ================= 全部命中记录 ================= */
+var START_ISSUE = '2026291';   // 统计起点：本站第一次预测的期号（之后每期自动累加）
+
+/* 逐期回放所有算法：按当时的连续未中期数算出“本期命中率”，中奖则记一笔并清零 */
+function renderWins() {
+  var out = [];
+  DATA.algos.forEach(function (a) {
+    var base = {}, streak = {}, n;
+    for (n = 1; n <= 10; n++) { base[n] = baseRate(a, n); streak[n] = 0; }
+    // 已结算记录按期号从旧到新回放
+    var settled = (a.history || []).filter(function (h) { return h.settled; })
+      .sort(function (x, y) { return x.target < y.target ? -1 : 1; });
+    settled.forEach(function (h) {
+      for (var k = 1; k <= 10; k++) {
+        var pz = (h.prize10 || {})[String(k)];
+        if (pz === undefined || pz === null) continue;
+        // 本期开奖前应显示的累计命中率
+        var acc = base[k] === null ? null : base[k] * (streak[k] + 1);
+        if (Number(pz) > 0) {
+          if (h.target >= START_ISSUE) {
+            out.push({
+              target: h.target, algo: a.name, n: k, acc: acc,
+              bet: (((h.bets || {})[String(k)] || [[]])[0]) || [],
+              actual: h.actual || [],
+              hits: Number((h.hits10 || {})[String(k)]) || 0,
+              prize: Number(pz)
+            });
+          }
+          streak[k] = 0;                    // 中奖 → 连续未中清零
+        } else {
+          streak[k]++;
+        }
+      }
+    });
+  });
+
+  // 新的期号在前；同一期按算法顺序、玩法从小到大
+  out.sort(function (x, y) {
+    if (x.target !== y.target) return x.target < y.target ? 1 : -1;
+    if (x.algo !== y.algo) return x.algo < y.algo ? -1 : 1;
+    return x.n - y.n;
+  });
+
+  var total = out.reduce(function (s, r) { return s + r.prize; }, 0);
+  document.getElementById('winTitle').textContent =
+    '命中记录（自 ' + START_ISSUE + ' 期起）· 共 ' + out.length + ' 次 · 合计 ' + total.toFixed(1) + ' 元';
+  if (!out.length) {
+    document.getElementById('winTable').innerHTML = '<div style="padding:14px" class="muted">暂无命中记录</div>';
+    return;
+  }
+  var rows = out.map(function (r) {
+    var nums = r.bet.map(function (v) {
+      var hit = r.actual.indexOf(v) >= 0;
+      return '<span class="' + (hit ? 'ok' : '') + '">' + ('0' + v).slice(-2) + '</span>';
+    }).join('<span class="sep"> </span>');
+    return '<tr>' +
+      '<td>' + r.target + '</td>' +
+      '<td>' + r.algo + '</td>' +
+      '<td><b>选' + CN[r.n - 1] + '</b></td>' +
+      '<td class="hitnums">' + nums + '</td>' +
+      '<td>' + r.hits + '</td>' +
+      '<td class="' + lvClass(r.acc) + '">' + (r.acc === null ? '—' : r.acc.toFixed(1) + '%') + '</td>' +
+      '<td>' + r.prize.toFixed(1) + ' 元</td>' +
+      '</tr>';
+  }).join('');
+  document.getElementById('winTable').innerHTML =
+    '<table><thead><tr><th>期号</th><th>算法</th><th>玩法</th><th>号码</th><th>命中</th>' +
+    '<th>当时命中率</th><th>奖金</th></tr></thead><tbody>' + rows + '</tbody></table>';
 }
 
 loadData();
